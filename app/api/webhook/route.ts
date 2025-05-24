@@ -16,18 +16,18 @@ export async function POST(req: Request) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (error) {
-    console.error("❌ Webhook Signature Error:", error);
+    console.error("Webhook Signature Error:", error);
     return new NextResponse(`Webhook Error: ${error}`, { status: 400 });
   }
 
-  // ✅ تحديد نوع الحدث
+
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
-    // ✅ تحقق من metadata
+
     const orderId = session?.metadata?.orderId;
     if (!orderId) {
-      console.warn("⚠️ No orderId in session metadata");
+      console.warn("No orderId in session metadata");
       return new NextResponse("No order ID", { status: 400 });
     }
 
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
         },
       });
 
-      console.log("✅ Order updated:", updatedOrder.id);
+      console.log("Order updated:", updatedOrder.id);
     } catch (error) {
       console.error("Error updating order in DB:", error);
       return new NextResponse("Database update error", { status: 500 });

@@ -9,10 +9,8 @@ import {
   ImageIcon,
   LayoutGrid,
   Package,
-  Ruler,
   Settings,
   ShoppingCart,
-  Palette,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react"
@@ -85,20 +83,6 @@ export function SidebarNav({ className, storeSwitcher, userButton, ...props }: S
       bgColor: "bg-amber-500/10",
     },
     {
-      href: `/${params.storeId}/sizes`,
-      label: "Sizes",
-      icon: Ruler,
-      color: "text-green-500 dark:text-green-400",
-      bgColor: "bg-green-500/10",
-    },
-    {
-      href: `/${params.storeId}/colors`,
-      label: "Colors",
-      icon: Palette,
-      color: "text-pink-500 dark:text-pink-400",
-      bgColor: "bg-pink-500/10",
-    },
-    {
       href: `/${params.storeId}/products`,
       label: "Products",
       icon: Package,
@@ -108,6 +92,13 @@ export function SidebarNav({ className, storeSwitcher, userButton, ...props }: S
     {
       href: `/${params.storeId}/orders`,
       label: "Orders",
+      icon: ShoppingCart,
+      color: "text-orange-500 dark:text-orange-400",
+      bgColor: "bg-orange-500/10",
+    },
+    {
+      href: `/${params.storeId}/import`,
+      label: "Bulk Import",
       icon: ShoppingCart,
       color: "text-orange-500 dark:text-orange-400",
       bgColor: "bg-orange-500/10",

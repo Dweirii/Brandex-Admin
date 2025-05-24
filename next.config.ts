@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    HYPERPAY_ACCESS_TOKEN: process.env.HYPERPAY_ACCESS_TOKEN,
+    HYPERPAY_ENTITY_ID: process.env.HYPERPAY_ENTITY_ID,
+    HYPERPAY_BASE_URL: process.env.HYPERPAY_BASE_URL,
+  },
   async redirects() {
     return [
       {
@@ -22,7 +27,19 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "brandex-cdn.b-cdn.net",
+      },
+      {
+        protocol: "https",
         hostname: "avatars.githubusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "image-brandex.b-cdn.net",
       },
     ],
   },

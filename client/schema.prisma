@@ -1,0 +1,133 @@
+// === PRISMA SCHEMA FOR BRANDEX SUPER APP ===
+// Author: Zaid Dweiri
+// Description: This schema defines the backend structure for a scalable digital products e-commerce platform.
+// Database: PostgreSQL via NeonDB
+
+// === Datasource & Generator ===
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../client"
+}
+
+// === Store ===
+// Represents a single e-commerce instance (multi-tenant architecture)
+model Store {
+  id     String @id @default(uuid())
+  name   String
+  userId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  categories Category[]
+  billboards Billboard[]
+  products   Product[]
+  orders     Order[]
+}
+
+// === Category ===
+// Used to classify products into sections (e.g., Logos, Flyers)
+model Category {
+  id          String @id @default(uuid())
+  storeId     String
+  billboardId String
+  name        String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products  Product[]
+  billboard Billboard @relation(fields: [billboardId], references: [id])
+  store     Store     @relation(fields: [storeId], references: [id])
+}
+
+// === Billboard ===
+// Visual banners on the store landing page
+model Billboard {
+  id       String @id @default(uuid())
+  storeId  String
+  label    String
+  imageUrl String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store      Store      @relation(fields: [storeId], references: [id])
+  categories Category[]
+}
+
+// === Product ===
+// Main digital product entity, sold through the storefront
+model Product {
+  id          String   @id @default(uuid())
+  storeId     String
+  categoryId  String
+  name        String
+  description String?
+  price       Decimal
+  keywords    String[] @default([]) // PostgreSQL array for search
+  downloadUrl String? // BunnyCDN secure file link
+  isFeatured  Boolean  @default(false)
+  isArchived  Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category   Category    @relation(fields: [categoryId], references: [id])
+  store      Store       @relation(fields: [storeId], references: [id])
+  image      Image[]
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+  @@index([storeId])
+}
+
+// === Image ===
+// Preview image URLs hosted on BunnyCDN
+model Image {
+  id        String @id @default(uuid())
+  productId String
+  url       String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// === Order ===
+// Each order submitted by a user (can include multiple items)
+model Order {
+  id              String  @id @default(uuid())
+  storeId         String
+  isPaid          Boolean @default(false)
+  email           String
+  price           Decimal
+  phone           String?
+  address         String?
+  deliveryDetails String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store      Store       @relation(fields: [storeId], references: [id])
+  orderItems OrderItem[]
+}
+
+// === OrderItem ===
+// A specific product within an order
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  productId String
+  price     Float
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id])
+}

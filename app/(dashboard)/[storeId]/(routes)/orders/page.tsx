@@ -42,7 +42,7 @@ const OrdersPage = async ({ params }: PageProps) => {
       notes: delivery.notes || "",
       isPaid: item.isPaid,
       products: item.orderItems.map((orderItem) => orderItem.product.name).join(", "),
-      totalPrice: formatter.format(item.price.toNumber()),
+      totalPrice: item.price ? formatter.format(item.price.toNumber()) : "N/A",
       createdAt: format(item.createdAt, "MMMM do, yyyy"),
     }
   })
@@ -52,10 +52,10 @@ const OrdersPage = async ({ params }: PageProps) => {
   const paidOrders = formattedOrders.filter((order) => order.isPaid).length
   const unpaidOrders = totalOrders - paidOrders
 
-  // Calculate total revenue from paid orders
+  // Calculate total revenue from paid orders (safe handling for price)
   const totalRevenue = orders
-    .filter((order) => order.isPaid)
-    .reduce((total, order) => total + order.price.toNumber(), 0)
+    .filter((order) => order.isPaid && order.price !== null)
+    .reduce((total, order) => total + (order.price?.toNumber() || 0), 0)
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -154,4 +154,3 @@ const OrdersPage = async ({ params }: PageProps) => {
 }
 
 export default OrdersPage
-

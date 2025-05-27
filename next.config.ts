@@ -22,11 +22,6 @@ const nextConfig = {
     ],
   },
 
-  experimental: {
-    css: {
-      lightningcss: false,
-    },
-  },
 };
 
 module.exports = nextConfig;

@@ -32,14 +32,11 @@ const OrdersPage = async ({ params }: PageProps) => {
   })
 
   const formattedOrders: OrderColumn[] = orders.map((item) => {
-    const delivery = JSON.parse(item.deliveryDetails || "{}")
 
     return {
       id: item.id,
-      fullName: delivery.fullName || "-",
-      phone: delivery.phoneNumber || "-",
-      address: `${delivery.city || ""} - ${delivery.address || ""}`,
-      notes: delivery.notes || "",
+      phone: item.phone || "-",
+      address: item.address?? "-",
       isPaid: item.isPaid,
       products: item.orderItems.map((orderItem) => orderItem.product.name).join(", "),
       totalPrice: item.price ? formatter.format(item.price.toNumber()) : "N/A",

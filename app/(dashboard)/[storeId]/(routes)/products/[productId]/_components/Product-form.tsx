@@ -41,7 +41,7 @@ type ProductFormValues = z.infer<typeof formSchema>
 interface ProductFormProps {
   initialData:
     | (Product & {
-        image: ImageType[]
+        Image: ImageType[]
       })
     | null
   categories: Category[]
@@ -74,8 +74,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
       ? {
           ...initialData,
           price: Number.parseFloat(String(initialData?.price)),
-          image: initialData.image || [],
-          keywords: initialData.keywords || [],
+          image: initialData.Image || [],
           description: initialData.description || "",
           downloadUrl: initialData.downloadUrl || "",
         }

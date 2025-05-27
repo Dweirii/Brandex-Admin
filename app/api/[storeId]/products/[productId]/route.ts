@@ -17,7 +17,7 @@ export async function GET(
     const product = await prismadb.product.findUnique({
       where: { id: productId },
       include: {
-        image: true,
+        Image: true,
         category: true,
       },
     });
@@ -77,7 +77,7 @@ export async function PATCH(
         isFeatured,
         description,
         downloadUrl,
-        image: {
+        Image: {
           deleteMany: {},
         },
       },
@@ -86,7 +86,7 @@ export async function PATCH(
     const product = await prismadb.product.update({
       where: { id: productId },
       data: {
-        image: {
+        Image: {
           createMany: {
             data: image.map((img: { url: string }) => ({ url: img.url })),
           },

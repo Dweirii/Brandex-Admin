@@ -32,6 +32,8 @@ model Store {
   billboards  Billboard[]
   products    Product[]
   orders      Order[]
+
+  ProductImportLog ProductImportLog[]
 }
 
 // === Category ===
@@ -68,28 +70,66 @@ model Billboard {
 // === Product ===
 // Main digital product entity, sold through the storefront
 model Product {
-  id           String     @id @default(uuid())
-  storeId      String
-  categoryId   String
-  name         String
-  description  String?
-  price        Decimal
-  keywords     String[]   @default([]) // PostgreSQL array for search
-  downloadUrl  String?                 // BunnyCDN secure file link
-  isFeatured   Boolean    @default(false)
-  isArchived   Boolean    @default(false)
+  id          String   @id @default(uuid())
+  storeId     String
+  categoryId  String
+  name        String
+  description String?
+  price       Decimal
+  downloadUrl String?
+  isFeatured  Boolean  @default(false)
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  store    Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id])
 
-  category     Category   @relation(fields: [categoryId], references: [id])
-  store        Store      @relation(fields: [storeId], references: [id])
-  image        Image[]
-  orderItems   OrderItem[]
-
-  @@index([categoryId])
+  @@unique([storeId, name], name: "storeId_name")
   @@index([storeId])
+  @@index([categoryId])
+  @@index([isFeatured])
+  @@index([isArchived])
+  @@index([createdAt])
+  @@map("products")
+  Image Image[]
+  OrderItem OrderItem[]
 }
+
+enum ImportStatus {
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+  CANCELLED
+}
+
+model ProductImportLog {
+  id              String       @id @default(uuid())
+  storeId         String
+  userId          String
+  fileName        String
+  fileSize        Int          @default(0)
+  totalRows       Int
+  processedRows   Int?         @default(0)
+  failedRows      Int?         @default(0)
+  status          ImportStatus @default(PROCESSING)
+  errorMessage    String?
+  processingTimeMs Int?
+  createdAt       DateTime     @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  metadata        Json?
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("product_import_logs")
+}
+
 
 // === Image ===
 // Preview image URLs hosted on BunnyCDN
@@ -115,7 +155,6 @@ model Order {
   price      Decimal?    @default(0.00)
   phone      String?
   address    String?
-  deliveryDetails String?
   sessionId String? @default("")
 
 

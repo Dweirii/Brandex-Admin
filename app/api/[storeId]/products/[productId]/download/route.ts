@@ -85,7 +85,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("[DownloadHandler] 💥 Error:", error);
+    console.error("[DownloadHandler] Error:", error);
     return new NextResponse("Internal Server Error", {
       status: 500,
       headers: corsHeaders,

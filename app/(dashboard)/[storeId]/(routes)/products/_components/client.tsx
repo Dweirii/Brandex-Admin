@@ -52,8 +52,8 @@ export const ProductClient: React.FC<ProductClientProps> = ({
               <div className="p-4">
                 <div className="flex items-center justify-between pb-5">
                   <Heading
-                    title={`Category (${data.length})`}
-                    description="Manage Categories for your store"
+                    title={`Products (${data.length})`}
+                    description="Manage Products for your store"
                   />
                   <Button onClick={handleCreate}>
                     <Plus className="w-4 h-4 mr-2" />

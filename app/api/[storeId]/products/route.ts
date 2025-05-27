@@ -20,7 +20,6 @@ export async function POST(
       isFeatured,
       isArchived,
       description,
-      keywords
     } = body;
 
     if (!userId) {
@@ -67,8 +66,7 @@ export async function POST(
         isFeatured,
         storeId,
         description,
-        keywords,
-        image: {
+        Image: {
           createMany: {
             data: image.map((img: { url: string }) => img),
           },
@@ -106,7 +104,7 @@ export async function GET(
         isArchived: false,
       },
       include: {
-        image: true,
+        Image: true,
         category: true,
         
       },

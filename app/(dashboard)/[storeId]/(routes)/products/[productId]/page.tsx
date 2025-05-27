@@ -13,7 +13,7 @@ const ProductPage = async ({ params }: PageProps) => {
             id: productId,
         },
         include: {
-            image: true,
+            Image: true,
         },
     });
 

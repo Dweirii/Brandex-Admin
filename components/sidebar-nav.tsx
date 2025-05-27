@@ -13,6 +13,7 @@ import {
   ShoppingCart,
   PanelLeftClose,
   PanelLeftOpen,
+  Import,
 } from "lucide-react"
 
 import {
@@ -97,9 +98,9 @@ export function SidebarNav({ className, storeSwitcher, userButton, ...props }: S
       bgColor: "bg-orange-500/10",
     },
     {
-      href: `/${params.storeId}/import`,
+      href: `/${params.storeId}/CSV`,
       label: "Bulk Import",
-      icon: ShoppingCart,
+      icon: Import,
       color: "text-orange-500 dark:text-orange-400",
       bgColor: "bg-orange-500/10",
     },

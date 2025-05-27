@@ -229,7 +229,7 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
                   <div>
                     <h3 className="font-semibold text-slate-900 dark:text-white mb-2">Upload & Validate</h3>
                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                      Drop your CSV file or click to browse. We'll automatically validate your data and show a preview.
+                      Drop your CSV file or click to browse. We&apos;ll automatically validate your data and show a preview.
                     </p>
                   </div>
                 </div>

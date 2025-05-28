@@ -152,15 +152,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
     toast.success("Image URL added successfully")
   }
 
- {
-
-
-    const currentKeywords = [...keywords]
-    currentKeywords.push(keyword.trim())
-    form.setValue("keywords", currentKeywords)
-    setKeyword("")
-  }
-
   return (
     <>
       <AleartModal isOpen={open} onClose={() => setOpen(false)} onConfirm={onDelete} loading={loading} />

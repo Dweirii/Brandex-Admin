@@ -29,7 +29,6 @@ const formSchema = z.object({
   description: z.string().optional(),
   image: z.array(z.object({ url: z.string() })).min(1, "At least one image is required"),
   price: z.coerce.number().min(0.01, "Price must be greater than 0"),
-  keywords: z.array(z.string()).default([]),
   downloadUrl: z.string().optional(),
   categoryId: z.string().min(1, "Category is required"),
   isFeatured: z.boolean().default(false),
@@ -52,7 +51,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [imageUrl, setImageUrl] = useState("")
-  const [keyword, setKeyword] = useState("")
 
   // Hooks
   const params = useParams()
@@ -83,7 +81,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
           description: "",
           image: [],
           price: 0,
-          keywords: [],
           downloadUrl: "",
           categoryId: "",
           isFeatured: false,
@@ -130,7 +127,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
 
   // Watch form values
   const images = form.watch("image")
-  const keywords = form.watch("keywords")
 
   // Image handlers
   const handleRemoveImage = (index: number) => {

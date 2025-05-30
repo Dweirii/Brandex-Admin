@@ -47,7 +47,7 @@ export async function PATCH(
       name,
       price,
       categoryId,
-      image,
+      Image,
       isFeatured,
       isArchived,
       description,
@@ -56,7 +56,7 @@ export async function PATCH(
 
     if (!userId) return new NextResponse("Unauthenticated", { status: 401 });
     if (!name) return new NextResponse("Name is required", { status: 400 });
-    if (!image || !image.length) return new NextResponse("Image URL is required", { status: 400 });
+    if (!Image || !Image.length) return new NextResponse("Image URL is required", { status: 400 });
     if (!price) return new NextResponse("Price is required", { status: 400 });
     if (!categoryId) return new NextResponse("Category is required", { status: 400 });
     if (!productId) return new NextResponse("Product id is required", { status: 400 });
@@ -88,7 +88,7 @@ export async function PATCH(
       data: {
         Image: {
           createMany: {
-            data: image.map((img: { url: string }) => ({ url: img.url })),
+            data: Image.map((img: { url: string }) => ({ url: img.url })),
           },
         },
       },

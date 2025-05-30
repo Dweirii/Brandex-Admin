@@ -16,7 +16,7 @@ export async function POST(
       name, 
       price,
       categoryId,
-      image,
+      Image,
       isFeatured,
       isArchived,
       description,
@@ -30,7 +30,7 @@ export async function POST(
       return new NextResponse("Name is required", { status: 400 });
     }
 
-    if (!image || !image.length) {
+    if (!Image || !Image.length) {
       return new NextResponse("Image URL is required", { status: 400 });
     }
 
@@ -68,7 +68,7 @@ export async function POST(
         description,
         Image: {
           createMany: {
-            data: image.map((img: { url: string }) => img),
+            data: Image.map((img: { url: string }) => img),
           },
         },
       },

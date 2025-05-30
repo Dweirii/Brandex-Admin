@@ -73,7 +73,7 @@ export async function GET(
     const expires = Math.floor(Date.now() / 1000) + LINK_EXPIRATION_SECONDS;
     const tokenInput = `${BUNNY_SIGNING_KEY}${filePath}${expires}`;
     const tokenHash = crypto.createHash("md5").update(tokenInput).digest("hex");
-    const encodedPath = encodeURIComponent(product.downloadUrl).replace(/%2F/g, "/");
+    const encodedPath = product.downloadUrl.replace(/^\//, "");
 
     const signedUrl = `${BUNNY_PULL_ZONE_URL}/${encodedPath}?token=${tokenHash}&expires=${expires}`;
 

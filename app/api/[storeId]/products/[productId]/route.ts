@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prismadb from "@/lib/prismadb";
+import { serializeProduct } from "@/lib/serialize-product";
 
 // GET a single product
 export async function GET(
@@ -26,7 +27,7 @@ export async function GET(
       return new NextResponse("Product not found", { status: 404 });
     }
 
-    return NextResponse.json(product);
+    return NextResponse.json(serializeProduct(product));
   } catch (error) {
     console.error("[Product_GET]", error);
     return new NextResponse("Internal Server Error", { status: 500 });
@@ -42,7 +43,6 @@ export async function PATCH(
     const { storeId, productId } = await context.params;
     const { userId } = await auth();
     const body = await req.json();
-
     const {
       name,
       price,
@@ -67,10 +67,26 @@ export async function PATCH(
 
     if (!storeByUserId) return new NextResponse("Unauthorized", { status: 403 });
 
+    const existingProduct = await prismadb.product.findFirst({
+      where: {
+        storeId,
+        name: name.trim(),
+        NOT: {
+          id: productId,
+        },
+      },
+    });
+
+    if (existingProduct) {
+      return new NextResponse("Another product with this name already exists.", {
+        status: 409,
+      });
+    }
+
     await prismadb.product.update({
       where: { id: productId },
       data: {
-        name,
+        name: name.trim(),
         price,
         categoryId,
         isArchived,
@@ -85,6 +101,10 @@ export async function PATCH(
 
     const product = await prismadb.product.update({
       where: { id: productId },
+      include: {
+        Image: true,
+        category: true,
+      },
       data: {
         Image: {
           createMany: {
@@ -94,12 +114,14 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(product);
+    return NextResponse.json(serializeProduct(product));
   } catch (error) {
     console.error("[Product_PATCH]", error);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
+
+
 
 // DELETE product
 export async function DELETE(
@@ -123,7 +145,7 @@ export async function DELETE(
       where: { id: productId },
     });
 
-    return NextResponse.json(product);
+    return NextResponse.json(serializeProduct(product));
   } catch (error) {
     console.error("[Product_DELETE]", error);
     return new NextResponse("Internal Server Error", { status: 500 });

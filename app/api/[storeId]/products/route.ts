@@ -8,44 +8,32 @@ export async function POST(
   context: { params: Promise<{ storeId: string }> }
 ) {
   try {
-    const { storeId } = await context.params; // Await params before destructuring
+    const { storeId } = await context.params;
     const { userId } = await auth();
     const body = await req.json();
 
-    const { 
-      name, 
+    const {
+      name,
       price,
       categoryId,
       Image,
       isFeatured,
       isArchived,
       description,
+      downloadUrl,
     } = body;
 
-    if (!userId) {
-      return new NextResponse("Unauthenticated", { status: 401 });
-    }
-
-    if (!name) {
-      return new NextResponse("Name is required", { status: 400 });
-    }
-
-    if (!Image || !Image.length) {
+    // Basic validation
+    if (!userId) return new NextResponse("Unauthenticated", { status: 401 });
+    if (!name) return new NextResponse("Name is required", { status: 400 });
+    if (!Image || !Image.length)
       return new NextResponse("Image URL is required", { status: 400 });
-    }
+    if (!price) return new NextResponse("Price is required", { status: 400 });
+    if (!categoryId) return new NextResponse("Category is required", { status: 400 });
+    if (!storeId) return new NextResponse("Store ID is required", { status: 400 });
+    if (!downloadUrl) return new NextResponse("Download URL is required", { status: 400 });
 
-    if (!price) {
-      return new NextResponse("Price is required", { status: 400 });
-    }
-
-    if (!categoryId) {
-      return new NextResponse("Category is required", { status: 400 });
-    }
-
-    if (!storeId) {
-      return new NextResponse("Store ID is required", { status: 400 });
-    }
-
+    // Check if user owns the store
     const storeByUserId = await prismadb.store.findFirst({
       where: {
         id: storeId,
@@ -57,15 +45,29 @@ export async function POST(
       return new NextResponse("Unauthorized", { status: 403 });
     }
 
+    // Check for duplicate product name within the same store
+    const existingProduct = await prismadb.product.findFirst({
+      where: {
+        storeId,
+        name: name.trim(),
+      },
+    });
+
+    if (existingProduct) {
+      return new NextResponse("Product with this name already exists.", { status: 409 });
+    }
+
+    // Create product
     const product = await prismadb.product.create({
       data: {
-        name,
+        name: name.trim(),
         price,
         categoryId,
         isArchived,
         isFeatured,
         storeId,
         description,
+        downloadUrl,
         Image: {
           createMany: {
             data: Image.map((img: { url: string }) => img),
@@ -81,13 +83,14 @@ export async function POST(
   }
 }
 
+
 // GET: Retrieve products
 export async function GET(
   req: Request,
   context: { params: Promise<{ storeId: string }> }
 ) {
   try {
-    const { storeId } = await context.params; // Await params before destructuring
+    const { storeId } = await context.params;
     const { searchParams } = new URL(req.url);
     const categoryId = searchParams.get("categoryId") || undefined;
     const isFeatured = searchParams.get("isFeatured");
@@ -106,10 +109,9 @@ export async function GET(
       include: {
         Image: true,
         category: true,
-        
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 

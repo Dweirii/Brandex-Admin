@@ -88,26 +88,41 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
         },
   })
 
-  // Form submission handler
   const onSubmit = async (data: ProductFormValues) => {
     try {
       setLoading(true)
 
-      if (initialData) {
-        await axios.patch(`/api/${params.storeId}/products/${params.productId}`, data)
-      } else {
-        await axios.post(`/api/${params.storeId}/products`, data)
+      const { image, ...rest } = data
+      const payload = {
+        ...rest,
+        Image: image,
       }
+
+      if (initialData) {
+        await axios.patch(`/api/${params.storeId}/products/${params.productId}`, payload)
+      } else {
+        await axios.post(`/api/${params.storeId}/products`, payload)
+      }
+
+      toast.success(toastMessage)
       router.refresh()
       router.push(`/${params.storeId}/products`)
-      toast.success(toastMessage)
-    } catch (error) {
-      toast.error("Something went wrong")
-      console.error(error)
+    } 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    catch (error: any) {
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        toast.error("A product with this name already exists. Please choose a different name.")
+      } else {
+        toast.error("Something went wrong. Please try again.")
+      }
+
+      console.error("Form submission error:", error)
     } finally {
       setLoading(false)
     }
   }
+
+
 
   // Delete handler
   const onDelete = async () => {

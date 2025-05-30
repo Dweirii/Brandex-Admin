@@ -60,6 +60,10 @@ export async function POST(
     return total + product.price.toNumber();
   }, 0);
 
+  if(totalPrice < 0.6) {
+    return new NextResponse("Minimun payment amount is 0.60", {status:400});
+  }
+
   const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = products.map((product) => ({
     quantity: 1,
     price_data: {

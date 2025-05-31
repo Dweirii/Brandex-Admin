@@ -66,7 +66,14 @@ export async function GET(req: Request) {
       storeId: order.storeId,
     }));
 
-    return NextResponse.json({ orderItems }, { headers: corsHeaders });
+  return NextResponse.json(
+    {
+      status: order.isPaid ? "paid" : "unpaid",
+      orderItems,
+    },
+    { headers: corsHeaders }
+  );
+
   } catch (error) {
     console.error("[STRIPE_SESSION_ERROR]", error);
     return new NextResponse("Internal Server Error", {

@@ -1,5 +1,3 @@
-// /app/api/checkout/session/route.ts
-
 import { NextResponse } from "next/server";
 import prismadb from "@/lib/prismadb";
 import Stripe from "stripe";

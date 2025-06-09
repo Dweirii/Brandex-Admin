@@ -1,11 +1,8 @@
-// app/(dashboard)/[storeId]/(routes)/CSV/page.tsx
-
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import prismadb from "@/lib/prismadb";
 import CsvImportPage from "@/components/csv-import/csv-import-page";
 
-// ✅ Important: Next.js 15 passes params as Promise
 interface ImportPageProps {
   params: Promise<{
     storeId: string;
@@ -13,7 +10,7 @@ interface ImportPageProps {
 }
 
 export default async function ImportPage({ params }: ImportPageProps) {
-  const { storeId } = await params; // ✅ await the params
+  const { storeId } = await params;
 
   const { userId } = await auth();
 

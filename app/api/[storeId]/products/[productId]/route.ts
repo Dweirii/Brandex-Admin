@@ -52,6 +52,7 @@ export async function PATCH(
       isArchived,
       description,
       downloadUrl,
+      keywords,
     } = body;
 
     if (!userId) return new NextResponse("Unauthenticated", { status: 401 });
@@ -93,6 +94,7 @@ export async function PATCH(
         isFeatured,
         description,
         downloadUrl,
+        keywords,
         Image: {
           deleteMany: {},
         },
@@ -120,8 +122,6 @@ export async function PATCH(
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
-
-
 
 // DELETE product
 export async function DELETE(

@@ -5,7 +5,6 @@ import prismadb from "@/lib/prismadb";
 import { validateProductBatch } from "@/lib/validation/product-import-schema";
 import { Decimal } from "@prisma/client/runtime/library";
 
-// Simple in-memory rate limiting for production
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
 function checkRateLimit(userId: string): boolean {
@@ -33,8 +32,8 @@ export async function POST(
 ) {
   try {
     const { storeId } = await context.params;
-
     const { userId } = await auth();
+
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -167,6 +166,7 @@ export async function POST(
                     downloadUrl: row.downloadUrl || null,
                     isFeatured: row.isFeatured,
                     isArchived: row.isArchived,
+                    keywords: row.keywords,
                     updatedAt: new Date(),
                   },
                   create: {
@@ -178,6 +178,7 @@ export async function POST(
                     downloadUrl: row.downloadUrl || null,
                     isFeatured: row.isFeatured,
                     isArchived: row.isArchived,
+                    keywords: row.keywords,
                   },
                 });
                 processedCount++;

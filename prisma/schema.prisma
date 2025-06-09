@@ -70,13 +70,14 @@ model Billboard {
 // === Product ===
 // Main digital product entity, sold through the storefront
 model Product {
-  id          String   @id @default(uuid())
-  storeId     String
-  categoryId  String
-  name        String
-  description String?
-  price       Decimal
-  downloadUrl String?
+  id              String   @id @default(uuid())
+  storeId         String
+  categoryId      String
+  name            String
+  description     String?
+  price           Decimal
+  downloadUrl     String?
+  keywords        String[]     @default([])
   isFeatured  Boolean  @default(false)
   isArchived  Boolean  @default(false)
   createdAt   DateTime @default(now())
@@ -109,6 +110,7 @@ model ProductImportLog {
   storeId         String
   userId          String
   fileName        String
+  keywords        String[]     @default([])
   fileSize        Int          @default(0)
   totalRows       Int
   processedRows   Int?         @default(0)

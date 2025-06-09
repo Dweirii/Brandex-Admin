@@ -21,6 +21,7 @@ export async function POST(
       isArchived,
       description,
       downloadUrl,
+      keywords,
     } = body;
 
     // Basic validation
@@ -68,6 +69,7 @@ export async function POST(
         storeId,
         description,
         downloadUrl,
+        keywords,
         Image: {
           createMany: {
             data: Image.map((img: { url: string }) => img),
@@ -82,7 +84,6 @@ export async function POST(
     return new NextResponse("Internal server error", { status: 500 });
   }
 }
-
 
 // GET: Retrieve products
 export async function GET(

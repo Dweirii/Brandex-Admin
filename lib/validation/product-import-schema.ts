@@ -1,6 +1,5 @@
 import { z } from "zod"
 
-// Enhanced validation with better error messages
 export const productImportSchema = z.object({
   name: z
     .string()
@@ -35,6 +34,18 @@ export const productImportSchema = z.object({
     .optional()
     .transform((val) => val === "true" || val === "1" || val === "yes")
     .default("false"),
+
+  keywords: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) => {
+      if (typeof val === "string") {
+        return val.split(",").map((k) => k.trim()).filter(Boolean);
+      }
+      return val;
+    }),
+
+
 })
 
 export type ProductImportRow = z.input<typeof productImportSchema>

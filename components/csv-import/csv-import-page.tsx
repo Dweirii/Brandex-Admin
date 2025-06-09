@@ -56,7 +56,6 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
 
-  // File drop handler
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const csvFile = acceptedFiles[0]
     if (!csvFile) return
@@ -64,16 +63,14 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
     setFile(csvFile)
     setImportResult(null)
 
-    // Parse CSV for preview
     Papa.parse(csvFile, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
         const data = results.data as ProductImportRow[]
-        const preview = data.slice(0, 10) // First 10 rows
+        const preview = data.slice(0, 10)
         setPreviewData(preview)
 
-        // Client-side validation
         validateRows(data)
       },
       error: (error) => {
@@ -87,11 +84,10 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
     accept: {
       "text/csv": [".csv"],
     },
-    maxSize: 5 * 1024 * 1024, // 5MB
+    maxSize: 5 * 1024 * 1024,
     multiple: false,
   })
 
-  // Client-side validation
   const validateRows = (data: ProductImportRow[]) => {
     const errors: ValidationError[] = []
 
@@ -111,7 +107,6 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
     setValidationErrors(errors)
   }
 
-  // Enhanced chunked upload with progress simulation
   const handleImport = async () => {
     if (!file) return
 
@@ -122,7 +117,6 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
       const formData = new FormData()
       formData.append("file", file)
 
-      // Simulate progress during upload
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) => {
           if (prev >= 90) {
@@ -137,7 +131,7 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
         method: "POST",
         body: formData,
         headers: {
-          "X-Requested-With": "XMLHttpRequest", // CSRF protection
+          "X-Requested-With": "XMLHttpRequest",
         },
       })
 
@@ -165,7 +159,6 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
     }
   }
 
-  // Export failed rows
   const handleExportFailedRows = () => {
     if (importResult?.failedRows) {
       exportFailedRowsAsCsv(importResult.failedRows)

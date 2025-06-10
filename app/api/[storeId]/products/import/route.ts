@@ -130,7 +130,7 @@ export async function POST(
     for (let i = 0; i < validRows.length; i += chunkSize) {
       chunks.push(validRows.slice(i, i + chunkSize));
     }
-
+    
     let processedCount = 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const failedRows: any[] = [];
@@ -152,7 +152,7 @@ export async function POST(
                   throw new Error(`Category with ID ${row.categoryId} does not exist`);
                 }
 
-                await tx.product.upsert({
+                const product = await tx.product.upsert({
                   where: {
                     storeId_name: {
                       storeId,
@@ -181,6 +181,17 @@ export async function POST(
                     keywords: row.keywords,
                   },
                 });
+
+                // ✅ Create associated image if present
+                if (row.imageUrl) {
+                  await tx.image.create({
+                    data: {
+                      productId: product.id,
+                      url: row.imageUrl,
+                    },
+                  });
+                }
+
                 processedCount++;
               } catch (rowError) {
                 console.error(`Failed to process row: ${row.name}`, rowError);

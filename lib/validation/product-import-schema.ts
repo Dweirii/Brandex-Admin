@@ -5,15 +5,15 @@ export const productImportSchema = z.object({
     .string()
     .min(1, "Product name is required")
     .max(100, "Product name must be less than 100 characters")
-    .regex(/^[a-zA-Z0-9\s\-_.,()]+$/, "Product name contains invalid characters"),
+    .regex(/^[a-zA-Z0-9\\s\\-_.,()]+$/, "Product name contains invalid characters"),
 
   description: z.string().max(1000, "Description must be less than 1000 characters").optional().nullable(),
 
   price: z
     .string()
     .transform((val) => {
-      const num = Number.parseFloat(val.replace(/[,$]/g, ""))
-      return num
+      const num = Number.parseFloat(val.replace(/[,$]/g, ""));
+      return num;
     })
     .refine((val) => !isNaN(val) && val > 0 && val <= 999999.99, {
       message: "Price must be a positive number between 0.01 and 999,999.99",
@@ -22,6 +22,8 @@ export const productImportSchema = z.object({
   categoryId: z.string().uuid("Category ID must be a valid UUID format"),
 
   downloadUrl: z.string().optional(),
+
+  imageUrl: z.string().url("Image URL must be a valid URL").optional(), // ✅ أضف هذا
 
   isFeatured: z
     .string()
@@ -44,9 +46,8 @@ export const productImportSchema = z.object({
       }
       return val;
     }),
+});
 
-
-})
 
 export type ProductImportRow = z.input<typeof productImportSchema>
 export type ValidatedProductImportRow = z.output<typeof productImportSchema>

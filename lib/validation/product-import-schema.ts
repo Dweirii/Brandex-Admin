@@ -5,7 +5,8 @@ export const productImportSchema = z.object({
     .string()
     .min(1, "Product name is required")
     .max(100, "Product name must be less than 100 characters")
-    .regex(/^[a-zA-Z0-9\\s\\-_.,()]+$/, "Product name contains invalid characters"),
+    .regex(/^[a-zA-Z0-9\s\-_.:,()&+/]+$/, "Product name contains invalid characters"),
+
 
   description: z.string().max(1000, "Description must be less than 1000 characters").optional().nullable(),
 

@@ -1,90 +1,67 @@
-
-// === PRISMA SCHEMA FOR BRANDEX SUPER APP ===
-// Author: Zaid Dweiri
-// Description: This schema defines the backend structure for a scalable digital products e-commerce platform.
-// Database: PostgreSQL via NeonDB
-
-// === Datasource & Generator ===
-// prisma/schema.prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
 }
 
-
-
-// === Store ===
-// Represents a single e-commerce instance (multi-tenant architecture)
-model Store {
-  id          String      @id @default(uuid())
-  name        String
-  userId      String
-
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  categories  Category[]
-  billboards  Billboard[]
-  products    Product[]
-  orders      Order[]
-
-  ProductImportLog ProductImportLog[]
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-// === Category ===
-// Used to classify products into sections (e.g., Logos, Flyers)
+model Store {
+  id               String             @id @default(uuid())
+  name             String
+  userId           String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  billboards       Billboard[]
+  categories       Category[]
+  orders           Order[]
+  ProductImportLog ProductImportLog[]
+  products         Product[]
+}
+
 model Category {
-  id          String      @id @default(uuid())
+  id          String    @id @default(uuid())
   storeId     String
   billboardId String
   name        String
-
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  billboard   Billboard @relation(fields: [billboardId], references: [id])
+  store       Store     @relation(fields: [storeId], references: [id])
   products    Product[]
-  billboard   Billboard   @relation(fields: [billboardId], references: [id])
-  store       Store       @relation(fields: [storeId], references: [id])
 }
 
-// === Billboard ===
-// Visual banners on the store landing page
 model Billboard {
+  id         String     @id @default(uuid())
+  storeId    String
+  label      String
+  imageUrl   String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  store      Store      @relation(fields: [storeId], references: [id])
+  categories Category[]
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model Product {
   id          String      @id @default(uuid())
   storeId     String
-  label       String
-  imageUrl    String
-
+  categoryId  String
+  name        String
+  description String?
+  price       Decimal
+  downloadUrl String?
+  keywords    String[]    @default([])
+  isFeatured  Boolean     @default(false)
+  isArchived  Boolean     @default(false)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-
-  store       Store       @relation(fields: [storeId], references: [id])
-  categories  Category[]
-}
-
-// === Product ===
-// Main digital product entity, sold through the storefront
-model Product {
-  id              String   @id @default(uuid())
-  storeId         String
-  categoryId      String
-  name            String
-  description     String?
-  price           Decimal
-  downloadUrl     String?
-  keywords        String[]     @default([])
-  isFeatured  Boolean  @default(false)
-  isArchived  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  store    Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  category Category @relation(fields: [categoryId], references: [id])
+  Image       Image[]
+  OrderItem   OrderItem[]
+  category    Category    @relation(fields: [categoryId], references: [id])
+  store       Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@unique([storeId, name], name: "storeId_name")
   @@index([storeId])
@@ -93,37 +70,26 @@ model Product {
   @@index([isArchived])
   @@index([createdAt])
   @@map("products")
-  Image Image[]
-  OrderItem OrderItem[]
-}
-
-enum ImportStatus {
-  PROCESSING
-  COMPLETED
-  COMPLETED_WITH_ERRORS
-  FAILED
-  CANCELLED
 }
 
 model ProductImportLog {
-  id              String       @id @default(uuid())
-  storeId         String
-  userId          String
-  fileName        String
-  keywords        String[]     @default([])
-  fileSize        Int          @default(0)
-  totalRows       Int
-  processedRows   Int?         @default(0)
-  failedRows      Int?         @default(0)
-  status          ImportStatus @default(PROCESSING)
-  errorMessage    String?
+  id               String       @id @default(uuid())
+  storeId          String
+  userId           String
+  fileName         String
+  keywords         String[]     @default([])
+  fileSize         Int          @default(0)
+  totalRows        Int
+  processedRows    Int?         @default(0)
+  failedRows       Int?         @default(0)
+  status           ImportStatus @default(PROCESSING)
+  errorMessage     String?
   processingTimeMs Int?
-  createdAt       DateTime     @default(now())
-  startedAt       DateTime?
-  completedAt     DateTime?
-  metadata        Json?
-
-  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt        DateTime     @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+  metadata         Json?
+  store            Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@index([storeId])
   @@index([userId])
@@ -132,22 +98,15 @@ model ProductImportLog {
   @@map("product_import_logs")
 }
 
-
-// === Image ===
-// Preview image URLs hosted on BunnyCDN
 model Image {
-  id          String   @id @default(uuid())
-  productId   String
-  url         String
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt 
-
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  productId String
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
-// === Order ===
-// Each order submitted by a user (can include multiple items)
 model Order {
   id         String      @id @default(uuid())
   userId     String?
@@ -157,24 +116,26 @@ model Order {
   price      Decimal?    @default(0.00)
   phone      String?
   address    String?
-  sessionId String? @default("")
-
-
+  sessionId  String?     @default("")
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
-
   store      Store       @relation(fields: [storeId], references: [id])
   orderItems OrderItem[]
 }
 
-// === OrderItem ===
-// A specific product within an order
 model OrderItem {
   id        String   @id @default(uuid())
   orderId   String
   productId String
-  price     Decimal?  @default(0.00)
-
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  price     Decimal? @default(0.00)
   order     Order    @relation(fields: [orderId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+enum ImportStatus {
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+  CANCELLED
 }

@@ -28,9 +28,9 @@ import { Textarea } from "@/components/ui/textarea"
 import toast from "react-hot-toast"
 import axios from "axios"
 import { useParams, useRouter } from "next/navigation"
-import { AleartModal } from "@/components/modals/alert-modal" // Assuming this component exists
+import { AleartModal } from "@/components/modals/alert-modal"
 import { Card, CardContent } from "@/components/ui/card"
-import { useMobile } from "@/hooks/use-mobile" // Assuming this hook exists
+import { useMobile } from "@/hooks/use-mobile"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import Image from "next/image"
@@ -44,7 +44,7 @@ const formSchema = z.object({
     .array(z.object({ url: z.string().url("Please enter a valid URL") }))
     .min(1, "At least one image is required"),
   price: z.coerce.number().min(0.01, "Price must be greater than 0"),
-  downloadUrl: z.string().url("Please enter a valid URL for download link").optional().or(z.literal("")),
+  downloadUrl: z.string().optional(),
   categoryId: z.string().min(1, "Category is required"),
   keywords: z.array(z.string().min(1, "Keyword cannot be empty")).min(1, "At least one keyword is required"),
   isFeatured: z.boolean().default(false),
@@ -190,7 +190,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
         setCurrentKeyword("")
       } else {
         toast.error("Keyword already added.")
-        setCurrentKeyword("") // Clear input even if duplicate
+        setCurrentKeyword("") 
       }
     }
   }
@@ -424,7 +424,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
                                 sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                                 className="object-cover"
                                 onError={(e) => {
-                                  // Fallback for broken image links
                                   ;(e.target as HTMLImageElement).src = "/placeholder.svg?width=200&height=200"
                                 }}
                               />

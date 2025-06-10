@@ -175,7 +175,7 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-6">
-            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-xl shadow-lg">
+            <div className="p-3 bg-[#171717] rounded-xl shadow-lg">
               <Database className="h-8 w-8 text-white" />
             </div>
             <div>
@@ -189,7 +189,7 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
           </div>
 
           {/* Instructions Section */}
-          <Card className="mb-8 border-0 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+          <Card className="mb-8 border-0 shadow-lg bg-[#171717] backdrop-blur-sm">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2 text-xl text-slate-900 dark:text-white">
                 <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -254,7 +254,7 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
 
           {/* Stats Bar */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <Card className="border-0 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:shadow-xl transition-shadow">
+            <Card className="border-0 shadow-lg bg-[#171717] backdrop-blur-sm hover:shadow-xl transition-shadow">
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
@@ -268,7 +268,7 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:shadow-xl transition-shadow">
+            <Card className="border-0 shadow-lg bg-[#171717] backdrop-blur-sm hover:shadow-xl transition-shadow">
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-lg">
@@ -282,7 +282,7 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm hover:shadow-xl transition-shadow">
+            <Card className="border-0 shadow-lg bg-[#171717] backdrop-blur-sm hover:shadow-xl transition-shadow">
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-purple-100 dark:bg-purple-900/50 rounded-lg">
@@ -299,7 +299,7 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
         </div>
 
         {/* Upload Zone */}
-        <Card className="border-0 shadow-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm mb-8">
+        <Card className="border-0 shadow-xl bg-[#171717] backdrop-blur-sm mb-8">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-xl text-slate-900 dark:text-white">
               <Upload className="h-5 w-5 text-blue-600 dark:text-blue-400" />

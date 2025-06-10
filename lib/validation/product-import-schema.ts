@@ -21,7 +21,7 @@ export const productImportSchema = z.object({
 
   categoryId: z.string().uuid("Category ID must be a valid UUID format"),
 
-  downloadUrl: z.string().url("Download URL must be a valid URL").optional().nullable().or(z.literal("")),
+  downloadUrl: z.string().optional(),
 
   isFeatured: z
     .string()

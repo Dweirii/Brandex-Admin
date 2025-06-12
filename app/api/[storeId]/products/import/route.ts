@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { parse } from "csv-parse/sync";
+import { Decimal } from "@prisma/client/runtime/library";
 import prismadb from "@/lib/prismadb";
 import { validateProductBatch } from "@/lib/validation/product-import-schema";
-import { Decimal } from "@prisma/client/runtime/library";
 
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 
@@ -18,9 +18,7 @@ function checkRateLimit(userId: string): boolean {
     return true;
   }
 
-  if (userLimit.count >= maxRequests) {
-    return false;
-  }
+  if (userLimit.count >= maxRequests) return false;
 
   userLimit.count++;
   return true;
@@ -45,71 +43,62 @@ export async function POST(
       );
     }
 
-    const requestedWith = request.headers.get("X-Requested-With");
-    if (requestedWith !== "XMLHttpRequest") {
+    if (request.headers.get("X-Requested-With") !== "XMLHttpRequest") {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
     const store = await prismadb.store.findFirst({
-      where: { id: storeId, userId },
+      where: { id: storeId, userId }
     });
-
     if (!store) {
-      return NextResponse.json({ error: "Store not found or access denied" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Store not found or access denied" },
+        { status: 404 }
+      );
     }
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
-    if (!file.name.toLowerCase().endsWith(".csv")) {
+    if (!file || !file.name.toLowerCase().endsWith(".csv")) {
       return NextResponse.json({ error: "Only CSV files are allowed" }, { status: 400 });
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: "File size exceeds 5MB limit" }, { status: 400 });
+    if (file.size === 0 || file.size > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: "Invalid file size" }, { status: 400 });
     }
 
-    if (file.size === 0) {
-      return NextResponse.json({ error: "File is empty" }, { status: 400 });
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let records: any[];
+    const csvText = await file.text();
+    let records: unknown[];
     try {
-      const csvText = await file.text();
-      records = parse(csvText, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true,
-        relaxColumnCount: true,
-      });
+      records = parse(csvText, { columns: true, skip_empty_lines: true, trim: true });
     } catch {
       return NextResponse.json({ error: "CSV parsing failed" }, { status: 400 });
     }
 
-    if (records.length === 0) {
+    if (!Array.isArray(records) || records.length === 0) {
       return NextResponse.json({ error: "CSV file contains no data rows" }, { status: 400 });
     }
-
     if (records.length > 10000) {
       return NextResponse.json({ error: "CSV file contains too many rows (max 10,000)" }, { status: 400 });
     }
-
-    const { validRows, errors } = validateProductBatch(records);
-
+    //eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { validRows, errors } = validateProductBatch(records as any[]);
     if (errors.length > 0) {
       return NextResponse.json({
         success: false,
         processed: 0,
         failed: errors.length,
         errors,
-        failedRows: records.filter((_, i) => errors.some((e) => e.row === i + 1)),
+        failedRows: records.filter((_, i) => errors.some(e => e.row === i + 1))
       });
     }
+
+    const categoryIds = Array.from(new Set(validRows.map(r => r.categoryId)));
+    const existingCategories = await prismadb.category.findMany({
+      where: { id: { in: categoryIds } },
+      select: { id: true }
+    });
+    const existingSet = new Set(existingCategories.map(c => c.id));
 
     const importLogId = crypto.randomUUID();
     await prismadb.productImportLog.create({
@@ -121,127 +110,93 @@ export async function POST(
         fileSize: file.size,
         totalRows: validRows.length,
         status: "PROCESSING",
-        startedAt: new Date(),
-      },
+        startedAt: new Date()
+      }
     });
 
-    const chunkSize = 100;
-    const chunks = [];
-    for (let i = 0; i < validRows.length; i += chunkSize) {
-      chunks.push(validRows.slice(i, i + chunkSize));
-    }
-    
     let processedCount = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    //eslint-disable-next-line @typescript-eslint/no-explicit-any
     const failedRows: any[] = [];
     const processingErrors: string[] = [];
     const startTime = Date.now();
 
-    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-      const chunk = chunks[chunkIndex];
+    const batchSize = 100;
+    for (let i = 0; i < validRows.length; i += batchSize) {
+      const batch = validRows.slice(i, i + batchSize);
       try {
-        await prismadb.$transaction(
-          async (tx) => {
-            for (const row of chunk) {
-              try {
-                const categoryExists = await tx.category.findFirst({
-                  where: { id: row.categoryId },
-                });
-
-                if (!categoryExists) {
-                  throw new Error(`Category with ID ${row.categoryId} does not exist`);
-                }
-
-                const product = await tx.product.upsert({
-                  where: {
-                    storeId_name: {
-                      storeId,
-                      name: row.name,
-                    },
-                  },
-                  update: {
-                    description: row.description,
-                    price: new Decimal(row.price),
-                    categoryId: row.categoryId,
-                    downloadUrl: row.downloadUrl || null,
-                    isFeatured: row.isFeatured,
-                    isArchived: row.isArchived,
-                    keywords: row.keywords,
-                    updatedAt: new Date(),
-                  },
-                  create: {
-                    storeId,
-                    name: row.name,
-                    description: row.description,
-                    price: new Decimal(row.price),
-                    categoryId: row.categoryId,
-                    downloadUrl: row.downloadUrl || null,
-                    isFeatured: row.isFeatured,
-                    isArchived: row.isArchived,
-                    keywords: row.keywords,
-                  },
-                });
-
-                // ✅ Create associated image if present
-                if (row.imageUrl) {
-                  await tx.image.create({
-                    data: {
-                      productId: product.id,
-                      url: row.imageUrl,
-                    },
-                  });
-                }
-
-                processedCount++;
-              } catch (rowError) {
-                console.error(`Failed to process row: ${row.name}`, rowError);
-                failedRows.push(row);
-                processingErrors.push(`Row ${processedCount + failedRows.length}: Error`);
-              }
+        await prismadb.$transaction(async tx => {
+          for (const row of batch) {
+            if (!existingSet.has(row.categoryId)) {
+              throw new Error(`Category ID not found: ${row.categoryId}`);
             }
-          },
-          { timeout: 30000 }
-        );
-      } catch (chunkError) {
-        console.error(`Failed to process chunk ${chunkIndex}:`, chunkError);
-        chunk.forEach((row) => {
+            const product = await tx.product.upsert({
+              where: { storeId_name: { storeId, name: row.name } },
+              update: {
+                description: row.description,
+                price: new Decimal(row.price),
+                categoryId: row.categoryId,
+                downloadUrl: row.downloadUrl || null,
+                isFeatured: row.isFeatured,
+                isArchived: row.isArchived,
+                keywords: row.keywords,
+                updatedAt: new Date()
+              },
+              create: {
+                storeId,
+                name: row.name,
+                description: row.description,
+                price: new Decimal(row.price),
+                categoryId: row.categoryId,
+                downloadUrl: row.downloadUrl || null,
+                isFeatured: row.isFeatured,
+                isArchived: row.isArchived,
+                keywords: row.keywords
+              }
+            });
+            if (row.imageUrl) {
+              // now actually await image creation
+              await tx.image.create({
+                data: {
+                  url: row.imageUrl,
+                  product: { connect: { id: product.id } }
+                }
+              });
+            }
+            processedCount++;
+          }
+        }, { timeout: 60000 });
+      } catch (batchError) {
+        console.error(`Batch starting at ${i} failed`, batchError);
+        batch.forEach(row => {
           failedRows.push(row);
-          processingErrors.push(`Chunk ${chunkIndex} failed`);
+          processingErrors.push(`Row ${row.name}: ${String(batchError)}`);
         });
       }
     }
 
     const processingTime = Date.now() - startTime;
-
     await prismadb.productImportLog.update({
       where: { id: importLogId },
       data: {
         processedRows: processedCount,
         failedRows: failedRows.length,
         status: failedRows.length > 0 ? "COMPLETED_WITH_ERRORS" : "COMPLETED",
-        errorMessage: processingErrors.length > 0 ? processingErrors.join("; ") : null,
+        errorMessage: processingErrors.join("; ") || null,
         processingTimeMs: processingTime,
-        completedAt: new Date(),
-      },
+        completedAt: new Date()
+      }
     });
 
     return NextResponse.json({
       success: failedRows.length === 0,
       processed: processedCount,
       failed: failedRows.length,
-      errors: processingErrors.map((error, index) => ({
-        row: index + 1,
-        field: "processing",
-        message: error,
-      })),
+      errors: processingErrors.map((msg, idx) => ({ row: idx + 1, field: "processing", message: msg })),
       failedRows,
-      importLogId,
+      importLogId
     });
   } catch (error) {
     console.error("Import error:", error);
-    return NextResponse.json(
-      { error: "Internal server error. Please try again later." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error. Please try again later." }, { status: 500 });
   }
 }

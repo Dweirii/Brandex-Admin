@@ -117,6 +117,7 @@ model Order {
   phone      String?
   address    String?
   sessionId  String?     @default("")
+  sessionVerified Boolean  @default(false)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   store      Store       @relation(fields: [storeId], references: [id])

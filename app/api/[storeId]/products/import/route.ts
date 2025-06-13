@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { parse } from "csv-parse/sync";
@@ -81,7 +82,8 @@ export async function POST(
     if (records.length > 10000) {
       return NextResponse.json({ error: "CSV file contains too many rows (max 10,000)" }, { status: 400 });
     }
-    //eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { validRows, errors } = validateProductBatch(records as any[]);
     if (errors.length > 0) {
       return NextResponse.json({
@@ -93,9 +95,10 @@ export async function POST(
       });
     }
 
+    // Preload categories to speed up validation
     const categoryIds = Array.from(new Set(validRows.map(r => r.categoryId)));
     const existingCategories = await prismadb.category.findMany({
-      where: { id: { in: categoryIds } },
+      where: { id: { in: categoryIds }},
       select: { id: true }
     });
     const existingSet = new Set(existingCategories.map(c => c.id));
@@ -115,8 +118,7 @@ export async function POST(
     });
 
     let processedCount = 0;
-    //eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const failedRows: any[] = [];
+    const failedRows: unknown[] = [];
     const processingErrors: string[] = [];
     const startTime = Date.now();
 
@@ -154,7 +156,6 @@ export async function POST(
               }
             });
             if (row.imageUrl) {
-              // now actually await image creation
               await tx.image.create({
                 data: {
                   url: row.imageUrl,

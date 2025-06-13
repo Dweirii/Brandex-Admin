@@ -18,8 +18,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const sessionId = searchParams.get("session_id");
     const userAgent = req.headers.get("user-agent") || "";
-
-    // ⛔️ احمي نفسك من البوتات أو requests الغريبة
+    
     if (userAgent.toLowerCase().includes("bot") || userAgent.length < 10) {
       return new NextResponse("Blocked", { status: 403, headers: corsHeaders });
     }

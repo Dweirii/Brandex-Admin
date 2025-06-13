@@ -7,7 +7,6 @@ export const productImportSchema = z.object({
     .max(100, "Product name must be less than 100 characters")
     .regex(/^[a-zA-Z0-9\s\-_.:,()&+/]+$/, "Product name contains invalid characters"),
 
-
   description: z.string().max(1000, "Description must be less than 1000 characters").optional().nullable(),
 
   price: z
@@ -24,7 +23,15 @@ export const productImportSchema = z.object({
 
   downloadUrl: z.string().optional(),
 
-  imageUrl: z.string().url("Image URL must be a valid URL").optional(), // ✅ أضف هذا
+  imageUrl: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((val) => {
+      if (typeof val === "string") {
+        return val.split(",").map((url) => url.trim()).filter(Boolean);
+      }
+      return val;
+    }),
 
   isFeatured: z
     .string()
@@ -47,13 +54,11 @@ export const productImportSchema = z.object({
       }
       return val;
     }),
-});
-
+})
 
 export type ProductImportRow = z.input<typeof productImportSchema>
 export type ValidatedProductImportRow = z.output<typeof productImportSchema>
 
-// Enhanced batch validation with detailed error reporting
 export const validateProductBatch = (rows: ProductImportRow[]) => {
   const validRows: ValidatedProductImportRow[] = []
   const errors: Array<{ row: number; field: string; message: string }> = []

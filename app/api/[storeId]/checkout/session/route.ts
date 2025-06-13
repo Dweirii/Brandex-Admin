@@ -10,21 +10,26 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Credentials": "true",
+  "Access-Control-Allow-Credentials": "true",
 };
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const sessionId = searchParams.get("session_id");
-
-  if (!sessionId) {
-    return new NextResponse("Session ID required", {
-      status: 400,
-      headers: corsHeaders,
-    });
-  }
-
   try {
+    const { searchParams } = new URL(req.url);
+    const sessionId = searchParams.get("session_id");
+    const userAgent = req.headers.get("user-agent") || "";
+
+    if (userAgent.toLowerCase().includes("bot") || userAgent.length < 10) {
+      return new NextResponse("Blocked", { status: 403, headers: corsHeaders });
+    }
+
+    if (!sessionId || sessionId.length < 10) {
+      return new NextResponse("Invalid session ID", {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ["payment_intent"],
     });
@@ -57,6 +62,18 @@ export async function GET(req: Request) {
       });
     }
 
+    if (order.sessionVerified) {
+      return new NextResponse("Session already used", {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    await prismadb.order.update({
+      where: { id: orderId },
+      data: { sessionVerified: true },
+    });
+
     const orderItems = order.orderItems.map((item) => ({
       id: item.id,
       productId: item.productId,
@@ -64,13 +81,13 @@ export async function GET(req: Request) {
       storeId: order.storeId,
     }));
 
-  return NextResponse.json(
-    {
-      status: order.isPaid ? "paid" : "unpaid",
-      orderItems,
-    },
-    { headers: corsHeaders }
-  );
+    return NextResponse.json(
+      {
+        status: order.isPaid ? "paid" : "unpaid",
+        orderItems,
+      },
+      { headers: corsHeaders }
+    );
 
   } catch (error) {
     console.error("[STRIPE_SESSION_ERROR]", error);

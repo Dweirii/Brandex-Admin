@@ -10,13 +10,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sto
       return new NextResponse("Invalid payload", { status: 400 });
     }
 
-    await inngest.send({
-      name: "bulk.import",
-      data: {
-        storeId: (await params).storeId,
-        items,
-      },
-    });
+    const storeId = (await params).storeId;
+    const CHUNK_SIZE = 100;
+
+    for(let i = 0; i<items.length; i+= CHUNK_SIZE) {
+      const chunk = items.slice(i, i + CHUNK_SIZE);
+
+      await inngest.send({
+        name: "bulk.import",
+        data: {
+          storeId,
+          items,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

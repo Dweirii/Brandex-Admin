@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sto
         name: "bulk.import",
         data: {
           storeId,
-          items,
+          items: chunk,
         },
       });
     }

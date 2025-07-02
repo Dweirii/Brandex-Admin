@@ -43,6 +43,7 @@ const formSchema = z.object({
   image: z
     .array(z.object({ url: z.string().url("Please enter a valid URL") }))
     .min(1, "At least one image is required"),
+  videoUrl: z.string().url("Video URL must be a valid URL").optional(),
   price: z.coerce.number().min(0.01, "Price must be greater than 0"),
   downloadUrl: z.string().optional(),
   categoryId: z.string().min(1, "Category is required"),
@@ -92,6 +93,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
           description: initialData.description || "",
           downloadUrl: initialData.downloadUrl || "",
           keywords: initialData.keywords || [],
+          videoUrl: initialData.videoUrl || "",
         }
       : {
           name: "",
@@ -99,6 +101,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
           image: [],
           price: 0,
           downloadUrl: "",
+          videoUrl: "",
           categoryId: "",
           keywords: [],
           isFeatured: false,
@@ -445,6 +448,29 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
                               </div>
                             </div>
                           ))}
+                          <h3 className="text-lg font-medium mb-4">Download Information</h3>
+                            <FormField
+                              control={form.control}
+                              name="videoUrl"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-base">Product Video URL (Optional)</FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                      <Input
+                                        disabled={loading}
+                                        placeholder="https://your-cdn.com/product-video.mp4"
+                                        {...field}
+                                        className="h-12 text-base pl-10 bg-background border-input"
+                                      />
+                                    </div>
+                                  </FormControl>
+                                  <FormDescription>Optional video preview link. Must be a valid URL (e.g., .mp4).</FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                         </div>
                       )}
                       {/* FormMessage for the entire image array field */}

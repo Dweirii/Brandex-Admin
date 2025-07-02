@@ -12,6 +12,7 @@ interface ProductRow {
   isFeatured: boolean;
   isArchived: boolean;
   keywords: string[];
+  videoUrl?: string | null;
 }
 
 // eslint-disable-next-line  @typescript-eslint/no-unused-vars
@@ -54,6 +55,8 @@ export const bulkImport = inngest.createFunction(
                 existing.isFeatured !== row.isFeatured ||
                 existing.isArchived !== row.isArchived ||
                 existing.categoryId !== row.categoryId ||
+                existing.videoUrl !== row.videoUrl ||
+
                 JSON.stringify(existing.keywords || []) !== JSON.stringify(row.keywords || []);
 
               if (!isDifferent) return;
@@ -68,6 +71,7 @@ export const bulkImport = inngest.createFunction(
                   isFeatured: row.isFeatured,
                   isArchived: row.isArchived,
                   keywords: row.keywords,
+                  videoUrl: row.videoUrl ?? null,
                 },
               });
 
@@ -89,6 +93,7 @@ export const bulkImport = inngest.createFunction(
                   isFeatured: row.isFeatured,
                   isArchived: row.isArchived,
                   keywords: row.keywords,
+                  videoUrl: row.videoUrl ?? null,
                   storeId: storeId,
                 },
               });

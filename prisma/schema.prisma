@@ -53,6 +53,7 @@ model Product {
   description String?
   price       Decimal
   downloadUrl String?
+  videoUrl    String?
   keywords    String[]    @default([])
   isFeatured  Boolean     @default(false)
   isArchived  Boolean     @default(false)

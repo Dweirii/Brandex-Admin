@@ -23,6 +23,20 @@ export const productImportSchema = z.object({
 
   downloadUrl: z.string().optional(),
 
+  videoUrl: z
+  .string()
+  .trim()
+  .optional()
+  .refine(
+    (val) =>
+      !val || val === "" || /^https?:\/\/.+\.(mp4|mov)$/i.test(val),
+    {
+      message: "Video URL must be a valid .mp4 or .mov URL",
+    }
+  ),
+
+
+
   imageUrl: z
     .union([z.string(), z.array(z.string())])
     .optional()

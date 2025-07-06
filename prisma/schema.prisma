@@ -109,20 +109,22 @@ model Image {
 }
 
 model Order {
-  id         String      @id @default(uuid())
-  userId     String?
-  storeId    String
-  isPaid     Boolean     @default(false)
-  email      String?
-  price      Decimal?    @default(0.00)
-  phone      String?
-  address    String?
-  sessionId  String?     @default("")
-  sessionVerified Boolean  @default(false)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  store      Store       @relation(fields: [storeId], references: [id])
-  orderItems OrderItem[]
+  id               String      @id @default(uuid())
+  userId           String?
+  storeId          String
+  isPaid           Boolean     @default(false)
+  email            String?
+  price            Decimal?    @default(0.00)
+  phone            String?
+  address          String?
+  paymentProvider  String?
+  transactionId    String?     
+  sessionId        String?     @default("")
+  sessionVerified  Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  store            Store       @relation(fields: [storeId], references: [id])
+  orderItems       OrderItem[]
 }
 
 model OrderItem {

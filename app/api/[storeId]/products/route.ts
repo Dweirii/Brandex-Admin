@@ -84,8 +84,7 @@ export async function POST(
     return new NextResponse("Internal server error", { status: 500 });
   }
 }
-
-// GET: Retrieve products
+// GET: Retrieve products with pagination
 export async function GET(
   req: Request,
   context: { params: Promise<{ storeId: string }> }
@@ -93,30 +92,50 @@ export async function GET(
   try {
     const { storeId } = await context.params;
     const { searchParams } = new URL(req.url);
+
     const categoryId = searchParams.get("categoryId") || undefined;
     const isFeatured = searchParams.get("isFeatured");
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "12", 10);
 
     if (!storeId) {
       return new NextResponse("Store ID is required", { status: 400 });
     }
 
-    const products = await prismadb.product.findMany({
-      where: {
-        storeId,
-        categoryId,
-        isFeatured: isFeatured ? true : undefined,
-        isArchived: false,
-      },
-      include: {
-        Image: true,
-        category: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const [products, total] = await Promise.all([
+      prismadb.product.findMany({
+        where: {
+          storeId,
+          categoryId,
+          isFeatured: isFeatured ? true : undefined,
+          isArchived: false,
+        },
+        include: {
+          Image: true,
+          category: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prismadb.product.count({
+        where: {
+          storeId,
+          categoryId,
+          isFeatured: isFeatured ? true : undefined,
+          isArchived: false,
+        },
+      }),
+    ]);
 
-    return NextResponse.json(products);
+    return NextResponse.json({
+      products,
+      total,
+      page,
+      pageCount: Math.ceil(total / limit),
+    });
   } catch (error) {
     console.error("Error in GET--Products", error);
     return new NextResponse("Internal server error", { status: 500 });

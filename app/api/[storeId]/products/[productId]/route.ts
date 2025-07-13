@@ -52,6 +52,7 @@ export async function PATCH(
       isArchived,
       description,
       downloadUrl,
+      videoUrl,
       keywords,
     } = body;
 
@@ -84,7 +85,7 @@ export async function PATCH(
       });
     }
 
-    await prismadb.product.update({
+    const product = await prismadb.product.update({
       where: { id: productId },
       data: {
         name: name.trim(),
@@ -94,25 +95,18 @@ export async function PATCH(
         isFeatured,
         description,
         downloadUrl,
+        videoUrl,
         keywords,
         Image: {
           deleteMany: {},
-        },
-      },
-    });
-
-    const product = await prismadb.product.update({
-      where: { id: productId },
-      include: {
-        Image: true,
-        category: true,
-      },
-      data: {
-        Image: {
           createMany: {
             data: Image.map((img: { url: string }) => ({ url: img.url })),
           },
         },
+      },
+      include: {
+        Image: true,
+        category: true,
       },
     });
 

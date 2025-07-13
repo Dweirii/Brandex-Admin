@@ -21,6 +21,7 @@ export async function POST(
       isArchived,
       description,
       downloadUrl,
+      videoUrl,
       keywords,
     } = body;
 
@@ -32,7 +33,7 @@ export async function POST(
     if (!price) return new NextResponse("Price is required", { status: 400 });
     if (!categoryId) return new NextResponse("Category is required", { status: 400 });
     if (!storeId) return new NextResponse("Store ID is required", { status: 400 });
-    if (!downloadUrl) return new NextResponse("Download URL is required", { status: 400 });
+    // downloadUrl is optional, so we don't validate it here
 
     // Check if user owns the store
     const storeByUserId = await prismadb.store.findFirst({
@@ -69,6 +70,7 @@ export async function POST(
         storeId,
         description,
         downloadUrl,
+        videoUrl,
         keywords,
         Image: {
           createMany: {

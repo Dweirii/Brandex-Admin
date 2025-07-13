@@ -43,7 +43,10 @@ const formSchema = z.object({
   image: z
     .array(z.object({ url: z.string().url("Please enter a valid URL") }))
     .min(1, "At least one image is required"),
-  videoUrl: z.string().url("Video URL must be a valid URL").optional(),
+  videoUrl: z.union([
+    z.string().url("Video URL must be a valid URL"),
+    z.literal("")
+  ]).optional(),
   price: z.coerce.number().min(0.01, "Price must be greater than 0"),
   downloadUrl: z.string().optional(),
   categoryId: z.string().min(1, "Category is required"),
@@ -116,6 +119,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
       const payload = {
         ...data,
         Image: data.image, // Ensure payload structure matches API expectation if it needs Image property
+        // Ensure all optional fields are properly handled
+        description: data.description || "",
+        downloadUrl: data.downloadUrl || "",
+        videoUrl: data.videoUrl || "",
+        keywords: data.keywords || [],
       }
 
       if (initialData) {
@@ -128,10 +136,21 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
       router.refresh()
       router.push(`/${params.storeId}/products`)
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 409) {
-        toast.error("A product with this name already exists. Please choose a different name.")
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 409) {
+          toast.error("A product with this name already exists. Please choose a different name.")
+        } else if (error.response?.status === 400) {
+          const errorMessage = error.response.data || "Please check your input and try again."
+          toast.error(errorMessage)
+        } else if (error.response?.status === 401) {
+          toast.error("You are not authenticated. Please sign in again.")
+        } else if (error.response?.status === 403) {
+          toast.error("You don't have permission to perform this action.")
+        } else {
+          toast.error("Server error. Please try again later.")
+        }
       } else {
-        toast.error("Something went wrong. Please try again.")
+        toast.error("Network error. Please check your connection and try again.")
       }
       console.error("Form submission error:", error)
     } finally {
@@ -448,29 +467,6 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
                               </div>
                             </div>
                           ))}
-                          <h3 className="text-lg font-medium mb-4">Download Information</h3>
-                            <FormField
-                              control={form.control}
-                              name="videoUrl"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-base">Product Video URL (Optional)</FormLabel>
-                                  <FormControl>
-                                    <div className="relative">
-                                      <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                                      <Input
-                                        disabled={loading}
-                                        placeholder="https://your-cdn.com/product-video.mp4"
-                                        {...field}
-                                        className="h-12 text-base pl-10 bg-background border-input"
-                                      />
-                                    </div>
-                                  </FormControl>
-                                  <FormDescription>Optional video preview link. Must be a valid URL (e.g., .mp4).</FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
                         </div>
                       )}
                       {/* FormMessage for the entire image array field */}
@@ -540,29 +536,53 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
 
             <Card className="border border-border bg-card shadow-sm">
               <CardContent className="pt-6">
-                <h3 className="text-lg font-medium mb-4">Download Information</h3>
-                <FormField
-                  control={form.control}
-                  name="downloadUrl"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base">Secure File Link (Optional)</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <FileDown className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                          <Input
-                            disabled={loading}
-                            placeholder="https://your-cdn.com/secure-file.zip"
-                            {...field}
-                            className="h-12 text-base pl-10 bg-background border-input"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormDescription>Optional secure download link for digital products.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <h3 className="text-lg font-medium mb-4">Media & Download Information</h3>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="videoUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base">Video URL (Optional)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                            <Input
+                              disabled={loading}
+                              placeholder="https://example.com/video.mp4"
+                              {...field}
+                              className="h-12 text-base pl-10 bg-background border-input"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>Optional video URL for product demonstration.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="downloadUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-base">Secure File Link (Optional)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <FileDown className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                            <Input
+                              disabled={loading}
+                              placeholder="https://your-cdn.com/secure-file.zip"
+                              {...field}
+                              className="h-12 text-base pl-10 bg-background border-input"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>Optional secure download link for digital products.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </CardContent>
             </Card>
 

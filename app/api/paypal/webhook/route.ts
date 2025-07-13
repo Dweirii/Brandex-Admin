@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import prismadb from "@/lib/prismadb";
+import { sendOrderNotificationToAdmin} from "@/lib/email";
+
 
 async function getPayPalToken() {
   const res = await fetch(`${process.env.PAYPAL_API_URL}/v1/oauth2/token`, {
@@ -66,7 +68,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing IDs" }, { status: 400 });
   }
 
-  const order = await prismadb.order.findUnique({ where: { id: orderId } });
+  const order = await prismadb.order.findUnique({ 
+    where: { id: orderId },
+    include: {
+      orderItems: {
+        include: {
+          product: true,
+        },
+      },
+      store: true,
+    },
+  });
+  
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
   if (order.isPaid) return NextResponse.json({ message: "Already paid" }, { status: 200 });
 
@@ -80,6 +93,27 @@ export async function POST(req: Request) {
     },
   });
   console.log(`Order ${orderId} marked paid via PayPal`);
+
+  if (order.email) {
+    // Prepare email data
+    const emailData = {
+      orderId: order.id,
+      customerEmail: order.email,
+      totalAmount: order.price?.toNumber() || 0,
+      products: order.orderItems.map(item => ({
+        name: item.product.name,
+        price: item.product.price.toNumber(),
+      })),
+      storeName: order.store.name,
+      paymentMethod: "PayPal",
+      orderDate: order.createdAt,
+    };
+
+    // Send notification to admin
+    await sendOrderNotificationToAdmin(emailData);
+    
+
+  }
 
   return NextResponse.json({ message: "OK" }, { status: 200 });
 }

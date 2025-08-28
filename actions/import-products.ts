@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache"
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional().nullable(),
-  price: z.coerce.number().positive("Price must be positive"),
+  price: z.coerce.number().min(0, "Price must be 0 or greater"),
   categoryId: z.string().min(1, "Category ID is required"),
   downloadUrl: z
     .union([

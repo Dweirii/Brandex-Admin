@@ -1,0 +1,11 @@
+name,price,categoryId,description,isFeatured,isArchived
+Product 1,10.99,cat_123,Valid product,true,false
+Product 2,-5.50,cat_456,Invalid negative price,false,true
+Product 3,25.00,cat_789,Valid product with high price,true,false
+,15.99,cat_123,Missing name,false,false
+Product 5,invalid_price,cat_456,Invalid price format,true,false
+Product 6,0,cat_789,Zero price product,false,true
+Product 7,99.99,cat_123,Valid expensive product,true,false
+Product 8,12.50,,Missing category ID,false,false
+Product 9,8.75,cat_456,Valid product,true,false
+Product 10,150.00,cat_789,Valid high-end product,false,true 

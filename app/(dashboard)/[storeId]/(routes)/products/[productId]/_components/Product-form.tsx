@@ -47,7 +47,7 @@ const formSchema = z.object({
     z.string().url("Video URL must be a valid URL"),
     z.literal("")
   ]).optional(),
-  price: z.coerce.number().min(0.01, "Price must be greater than 0"),
+  price: z.coerce.number().min(0, "Price must be 0 or greater"),
   downloadUrl: z.string().optional(),
   categoryId: z.string().min(1, "Category is required"),
   keywords: z.array(z.string().min(1, "Keyword cannot be empty")).min(1, "At least one keyword is required"),

@@ -143,3 +143,44 @@ export async function GET(
     return new NextResponse("Internal server error", { status: 500 });
   }
 }
+
+// DELETE: Delete all products for a store
+export async function DELETE(
+  req: Request,
+  context: { params: Promise<{ storeId: string }> }
+) {
+  try {
+    const { storeId } = await context.params;
+    const { userId } = await auth();
+
+    if (!userId) return new NextResponse("Unauthenticated", { status: 401 });
+    if (!storeId) return new NextResponse("Store ID is required", { status: 400 });
+
+    // Check if user owns the store
+    const storeByUserId = await prismadb.store.findFirst({
+      where: {
+        id: storeId,
+        userId,
+      },
+    });
+
+    if (!storeByUserId) {
+      return new NextResponse("Unauthorized", { status: 403 });
+    }
+
+    // Delete all products for the store
+    const deleteResult = await prismadb.product.deleteMany({
+      where: {
+        storeId,
+      },
+    });
+
+    return NextResponse.json({
+      message: `Successfully deleted ${deleteResult.count} products`,
+      deletedCount: deleteResult.count,
+    });
+  } catch (error) {
+    console.error("Error in DELETE--Products", error);
+    return new NextResponse("Internal server error", { status: 500 });
+  }
+}

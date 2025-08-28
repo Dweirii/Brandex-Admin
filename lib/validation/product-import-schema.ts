@@ -15,8 +15,8 @@ export const productImportSchema = z.object({
       const num = Number.parseFloat(val.replace(/[,$]/g, ""));
       return num;
     })
-    .refine((val) => !isNaN(val) && val > 0 && val <= 999999.99, {
-      message: "Price must be a positive number between 0.01 and 999,999.99",
+    .refine((val) => !isNaN(val) && val >= 0 && val <= 999999.99, {
+      message: "Price must be a number between 0 and 999,999.99",
     }),
 
   categoryId: z.string().uuid("Category ID must be a valid UUID format"),

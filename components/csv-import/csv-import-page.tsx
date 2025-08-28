@@ -18,9 +18,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { ErrorManagement } from "./error-management"
 
 interface CsvImportPageProps {
   storeId: string
+  onImportSuccess?: () => void
 }
 
 interface ValidationError {
@@ -43,13 +45,15 @@ type ImportStatus = "idle" | "parsing" | "uploading" | "completed" | "error"
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const PREVIEW_ROWS = 5
 
-export default function CsvImportPage({ storeId }: CsvImportPageProps) {
+export default function CsvImportPage({ storeId, onImportSuccess }: CsvImportPageProps) {
   const [rows, setRows] = useState<ValidatedProductImportRow[]>([])
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([])
   const [status, setStatus] = useState<ImportStatus>("idle")
   const [uploadProgress, setUploadProgress] = useState(0)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [fileName, setFileName] = useState<string>("")
+  const [showErrorManagement, setShowErrorManagement] = useState(false)
+  const [originalRows, setOriginalRows] = useState<ProductImportRow[]>([])
 
   const isLoading = status === "parsing" || status === "uploading"
   const hasErrors = validationErrors.length > 0
@@ -87,12 +91,14 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
             return
           }
 
+          setOriginalRows(results.data)
           const { validRows, errors } = validateProductBatch(results.data)
           setRows(validRows)
           setValidationErrors(errors)
           setStatus("completed")
 
           if (errors.length > 0) {
+            setShowErrorManagement(true)
             toast.error(`Found ${errors.length} validation errors. Please review and fix them.`)
           } else {
             toast.success(`Successfully parsed ${validRows.length} rows.`)
@@ -167,6 +173,7 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
 
       if (result.success) {
         toast.success(`Successfully imported ${result.processed} products!`)
+        onImportSuccess?.()
       } else {
         toast.error(`Import completed with ${result.failed} failures. Check the details below.`)
       }
@@ -197,6 +204,24 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
     setUploadProgress(0)
     setImportResult(null)
     setFileName("")
+    setShowErrorManagement(false)
+    setOriginalRows([])
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleErrorsFixed = (fixedRows: ValidatedProductImportRow[]): void => {
+    setRows(prev => [...prev, ...fixedRows])
+    setShowErrorManagement(false)
+    toast.success(`${fixedRows.length} rows added to import queue`)
+  }
+
+  const handleImportSuccess = (): void => {
+    setShowErrorManagement(false)
+    setRows([])
+    setValidationErrors([])
+    setOriginalRows([])
+    setImportResult(null)
+    toast.success("Import completed successfully!")
   }
 
   return (
@@ -396,8 +421,18 @@ export default function CsvImportPage({ storeId }: CsvImportPageProps) {
         </Card>
       )}
 
+      {/* Error Management */}
+      {showErrorManagement && (
+        <ErrorManagement
+          storeId={storeId}
+          originalRows={originalRows}
+          validationErrors={validationErrors}
+          onImportSuccess={handleImportSuccess}
+        />
+      )}
+
       {/* Data Preview */}
-      {rows.length > 0 && !hasErrors && (
+      {rows.length > 0 && !hasErrors && !showErrorManagement && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

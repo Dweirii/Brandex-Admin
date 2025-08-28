@@ -8,6 +8,7 @@ export type ProductColumn = {
   name:       string
   price:      string
   category:   string
+  categoryId: string
   isFeatured: string
   isArchived: string
   createdAt:  string

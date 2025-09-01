@@ -1,9 +1,9 @@
 "use client"
 
 import type React from "react"
-
-import { useParams, usePathname } from "next/navigation"
 import Link from "next/link"
+import { useParams, usePathname } from "next/navigation"
+
 import {
   BarChart3,
   ImageIcon,
@@ -14,6 +14,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Import,
+  Download,
 } from "lucide-react"
 
 import {
@@ -57,65 +58,74 @@ function CollapseButton() {
 
 export function SidebarNav({ className, storeSwitcher, userButton, ...props }: SidebarNavProps) {
   const pathname = usePathname()
-  const params = useParams()
+  const { storeId } = useParams() as { storeId: string }
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
 
+  if (!storeId) return null
+
   const routes = [
     {
-      href: `/${params.storeId}`,
+      href: `/${storeId}`,
       label: "Dashboard",
       icon: BarChart3,
       color: "text-blue-500 dark:text-blue-400",
-      bgColor: "bg-blue-500/10",
+      bgColor: "bg-blue-100 dark:bg-blue-900/20",
     },
     {
-      href: `/${params.storeId}/billboards`,
+      href: `/${storeId}/billboards`,
       label: "Billboards",
       icon: ImageIcon,
       color: "text-purple-500 dark:text-purple-400",
-      bgColor: "bg-purple-500/10",
+      bgColor: "bg-purple-100 dark:bg-purple-900/20",
     },
     {
-      href: `/${params.storeId}/categories`,
+      href: `/${storeId}/categories`,
       label: "Categories",
       icon: LayoutGrid,
       color: "text-amber-500 dark:text-amber-400",
-      bgColor: "bg-amber-500/10",
+      bgColor: "bg-amber-100 dark:bg-amber-900/20",
     },
     {
-      href: `/${params.storeId}/products`,
+      href: `/${storeId}/products`,
       label: "Products",
       icon: Package,
       color: "text-indigo-500 dark:text-indigo-400",
-      bgColor: "bg-indigo-500/10",
+      bgColor: "bg-indigo-100 dark:bg-indigo-900/20",
     },
     {
-      href: `/${params.storeId}/orders`,
+      href: `/${storeId}/orders`,
       label: "Orders",
       icon: ShoppingCart,
       color: "text-orange-500 dark:text-orange-400",
-      bgColor: "bg-orange-500/10",
+      bgColor: "bg-orange-100 dark:bg-orange-900/20",
     },
     {
-      href: `/${params.storeId}/CSV`,
+      href: `/${storeId}/downloads`,
+      label: "Downloads",
+      icon: Download,
+      color: "text-yellow-700 dark:text-yellow-400",
+      bgColor: "bg-yellow-100 dark:bg-yellow-900/20",
+    },
+    {
+      href: `/${storeId}/CSV`,
       label: "Bulk Import",
       icon: Import,
-      color: "text-orange-500 dark:text-orange-400",
-      bgColor: "bg-orange-500/10",
+      color: "text-pink-500 dark:text-pink-400",
+      bgColor: "bg-pink-100 dark:bg-pink-900/20",
     },
     {
-      href: `/${params.storeId}/settings`,
+      href: `/${storeId}/settings`,
       label: "Settings",
       icon: Settings,
       color: "text-gray-500 dark:text-gray-400",
-      bgColor: "bg-gray-500/10",
+      bgColor: "bg-gray-100 dark:bg-gray-900/20",
     },
   ]
 
   return (
     <Sidebar className={cn("border-r", className)} collapsible="icon" {...props}>
-      {/* Header with store switcher + collapse button */}
+      {/* Header */}
       <SidebarHeader className="border-b p-4 flex items-center justify-between">
         <div className="flex-1 overflow-hidden truncate">{storeSwitcher}</div>
         <div className="hidden md:block">
@@ -126,11 +136,11 @@ export function SidebarNav({ className, storeSwitcher, userButton, ...props }: S
         </div>
       </SidebarHeader>
 
-      {/* Navigation Links */}
+      {/* Links */}
       <SidebarContent className="py-2">
         <SidebarMenu>
           {routes.map((route) => {
-            const isActive = pathname === route.href
+            const isActive = pathname?.startsWith(route.href)
             return (
               <SidebarMenuItem key={route.href}>
                 <SidebarMenuButton
@@ -139,24 +149,39 @@ export function SidebarNav({ className, storeSwitcher, userButton, ...props }: S
                   tooltip={route.label}
                   className={cn(
                     "transition-all duration-200 relative",
-                    isActive ? "font-medium" : "font-normal hover:bg-muted/50",
+                    isActive ? "font-medium" : "font-normal hover:bg-muted/50"
                   )}
                 >
                   <Link href={route.href} className="flex items-center gap-3">
+                    {/* Icon */}
                     <div
                       className={cn(
-                        "flex items-center justify-center relative",
-                        isCollapsed ? "mx-auto" : "",
-                        isActive ? cn(route.color, route.bgColor, "rounded-md p-1") : "text-muted-foreground p-1",
+                        "flex items-center justify-center relative transition-all duration-200",
+                        isCollapsed ? "mx-auto" : "ml-1",
+                        isActive ? cn(route.color, route.bgColor, "rounded-md p-1") : "text-muted-foreground"
                       )}
                     >
-                      <route.icon className={cn("h-5 w-5 transition-all", isActive && "scale-110")} />
+                      <route.icon className={cn("h-5 w-5", isActive && "scale-110")} />
                     </div>
-                    <span className={cn("truncate transition-all", isActive ? route.color : "text-foreground")}>
+
+                    {/* Label */}
+                    <span
+                      className={cn(
+                        "truncate transition-all",
+                        isActive ? route.color : "text-foreground"
+                      )}
+                    >
                       {route.label}
                     </span>
-                    {isActive && !isCollapsed && (
-                      <span className="absolute inset-y-0 left-0 w-1 rounded-r-md bg-primary" />
+
+                    {/* Indicator */}
+                    {isActive && (
+                      <span
+                        className={cn(
+                          "absolute inset-y-0 left-0 w-1 rounded-r-md bg-primary transition-all",
+                          isCollapsed && "hidden"
+                        )}
+                      />
                     )}
                   </Link>
                 </SidebarMenuButton>
@@ -166,9 +191,8 @@ export function SidebarNav({ className, storeSwitcher, userButton, ...props }: S
         </SidebarMenu>
       </SidebarContent>
 
-      {/* Footer (user button) */}
+      {/* Footer */}
       <SidebarFooter className="border-t p-4">{userButton}</SidebarFooter>
     </Sidebar>
   )
 }
-

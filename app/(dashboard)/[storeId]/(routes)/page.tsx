@@ -1,13 +1,14 @@
 import { getGraphRevenue } from "@/actions/get-graph-revenue"
 import { getSalesCount } from "@/actions/get-sales-count"
 import { getStockCount } from "@/actions/get-stock-count"
+import { getTotalDownloads } from "@/actions/get-total-downloads"
 import { getTotalRevenue } from "@/actions/get-total-revenue"
 import { Overview } from "@/components/overview"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Heading } from "@/components/ui/heading"
 import { Separator } from "@/components/ui/separator"
 import { formatter } from "@/lib/utils"
-import { CreditCard, DollarSign, Package } from "lucide-react"
+import { CreditCard, DollarSign, Download, Package } from "lucide-react"
 
 export default async function DashboardPage({
   params,
@@ -20,6 +21,7 @@ export default async function DashboardPage({
   const salesCount = await getSalesCount(storeId)
   const stockCount = await getStockCount(storeId)
   const graphRevenue = await getGraphRevenue(storeId)
+  const totalDownloads = await getTotalDownloads(storeId)
 
   return (
     <div className="flex-col">
@@ -30,7 +32,7 @@ export default async function DashboardPage({
         </div>
         <Separator />
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="border-l-4 border-l-primary">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -54,6 +56,18 @@ export default async function DashboardPage({
             <CardContent>
               <div className="text-2xl font-bold">+{salesCount}</div>
               <p className="text-xs text-muted-foreground mt-1">Total completed orders</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-amber-800">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Downloads</CardTitle>
+              <div className="rounded-full bg-amber-800/10 p-2">
+                <Download className="h-4 w-4 text-amber-800" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">+{totalDownloads}</div>
             </CardContent>
           </Card>
 

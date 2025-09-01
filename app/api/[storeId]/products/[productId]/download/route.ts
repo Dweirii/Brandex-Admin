@@ -68,6 +68,13 @@ export async function GET(
     // Fetch the file from BunnyCDN or any other source
     const fileResponse = await fetch(product.downloadUrl);
 
+    await prismadb.product.update({
+      where: { id: productId },
+      data: {
+        downloadsCount: { increment: 1 },
+      },
+    });
+
     if (!fileResponse.ok || !fileResponse.body) {
       return new NextResponse("Failed to fetch file", {
         status: 500,

@@ -1,8 +1,0 @@
-name,description,price,categoryId,downloadUrl,imageUrl,isFeatured,isArchived,keywords,videoUrl
-"Product A","Product with negative price",-10.50,"550e8400-e29b-41d4-a716-446655440000","","https://example.com/imageA.jpg","true","false","error,negative-price",""
-"","Product with empty name",15.00,"550e8400-e29b-41d4-a716-446655440001","","https://example.com/imageB.jpg","false","false","error,empty-name",""
-"Product C","Product with invalid categoryId",25.00,"invalid-uuid-format","","https://example.com/imageC.jpg","true","false","error,invalid-uuid",""
-"Product D","Product with invalid price format","twenty-five","550e8400-e29b-41d4-a716-446655440000","","https://example.com/imageD.jpg","false","false","error,invalid-price",""
-"Product E","Product with invalid video URL",50.00,"550e8400-e29b-41d4-a716-446655440001","","https://example.com/imageE.jpg","true","false","error,video-url","https://example.com/video.txt"
-"Product F","Product with long name that exceeds the maximum length allowed by the validation schema to test the length constraint","This description is fine",10.00,"550e8400-e29b-41d4-a716-446655440002","","https://example.com/imageF.jpg","false","false","error,long-name",""
-"Product G","Another product with negative price and invalid categoryId",-5.00,"not-a-uuid","","https://example.com/imageG.jpg","true","true","multiple,errors","" 

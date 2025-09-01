@@ -1,6 +1,0 @@
-name,description,price,categoryId,downloadUrl,imageUrl,isFeatured,isArchived,keywords,videoUrl
-"Product 1","This is a test product with valid data",19.99,"550e8400-e29b-41d4-a716-446655440000","https://example.com/download1.pdf","https://example.com/image1.jpg,https://example.com/image2.jpg","true","false","test,product,valid","https://example.com/video1.mp4"
-"Product 2","Another test product with zero price",0.00,"550e8400-e29b-41d4-a716-446655440001","","https://example.com/image3.jpg","false","false","free,test",""
-"Product 3","Premium product with high price",299.99,"550e8400-e29b-41d4-a716-446655440002","https://example.com/download3.zip","https://example.com/image4.jpg,https://example.com/image5.jpg,https://example.com/image6.jpg","true","false","premium,high-quality","https://example.com/video3.mov"
-"Product 4","Simple product with minimal data",9.50,"550e8400-e29b-41d4-a716-446655440000","","https://example.com/image7.jpg","false","false","simple,minimal",""
-"Product 5","Archived product example",15.75,"550e8400-e29b-41d4-a716-446655440001","https://example.com/download5.pdf","https://example.com/image8.jpg","false","true","archived,example","" 

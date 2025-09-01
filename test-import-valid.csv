@@ -1,6 +1,0 @@
-name,price,categoryId,description,isFeatured,isArchived
-Valid Product 1,10.99,cat_123,First valid product,true,false
-Valid Product 2,25.50,cat_456,Second valid product,false,true
-Valid Product 3,99.99,cat_789,Third valid product,true,false
-Valid Product 4,5.00,cat_123,Fourth valid product,false,false
-Valid Product 5,150.00,cat_456,Fifth valid product,true,true 

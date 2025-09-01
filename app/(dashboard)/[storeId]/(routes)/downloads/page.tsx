@@ -1,14 +1,19 @@
+// app/(dashboard)/[storeId]/(routes)/downloads/page.tsx
+import { notFound } from "next/navigation"
 import { getDownloadsAnalytics } from "@/actions/get-download-analytics"
 import { getTopDownloadedProducts } from "@/actions/get-topDownloads"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Download, Package, DollarSign, Star, TrendingUp } from "lucide-react"
 
-interface DownloadsPageProps {
-  params: { storeId: string }
-}
+export default async function DownloadsPage({
+  params,
+}: {
+  params: Promise<{ storeId: string }>
+}) {
+  // Next.js 15: params is a Promise
+  const { storeId } = await params
+  if (!storeId) notFound()
 
-export default async function DownloadsPage({ params }: DownloadsPageProps) {
-  const { storeId } = await params;
   const analytics = await getDownloadsAnalytics(storeId)
   const topProducts = await getTopDownloadedProducts(storeId)
 
@@ -42,7 +47,9 @@ export default async function DownloadsPage({ params }: DownloadsPageProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-foreground">{analytics.totalDownloads.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-foreground">
+              {analytics.totalDownloads.toLocaleString()}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">All products combined</p>
           </CardContent>
         </Card>
@@ -55,7 +62,9 @@ export default async function DownloadsPage({ params }: DownloadsPageProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-foreground">{analytics.freeDownloads.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-foreground">
+              {analytics.freeDownloads.toLocaleString()}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">No cost products</p>
           </CardContent>
         </Card>
@@ -68,7 +77,9 @@ export default async function DownloadsPage({ params }: DownloadsPageProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-foreground">{analytics.paidDownloads.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-foreground">
+              {analytics.paidDownloads.toLocaleString()}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">Revenue generating</p>
           </CardContent>
         </Card>
@@ -119,7 +130,9 @@ export default async function DownloadsPage({ params }: DownloadsPageProps) {
                       <div className="flex flex-col items-center gap-2">
                         <Package className="h-8 w-8 text-muted-foreground/50" />
                         <p className="text-muted-foreground">No downloads yet</p>
-                        <p className="text-xs text-muted-foreground">Products will appear here once downloaded</p>
+                        <p className="text-xs text-muted-foreground">
+                          Products will appear here once downloaded
+                        </p>
                       </div>
                     </td>
                   </tr>
@@ -139,27 +152,31 @@ export default async function DownloadsPage({ params }: DownloadsPageProps) {
                       <td className="px-6 py-4 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <Download className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-semibold">{product.downloadsCount.toLocaleString()}</span>
+                          <span className="font-semibold">
+                            {product.downloadsCount.toLocaleString()}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                          className={cn(
+                            "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium",
                             Number(product.price) === 0
                               ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
                               : "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
-                          }`}
+                          )}
                         >
                           {formatPrice(product.price)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                          className={cn(
+                            "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium",
                             Number(product.price) === 0
                               ? "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
                               : "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400"
-                          }`}
+                          )}
                         >
                           {Number(product.price) === 0 ? "Free" : "Paid"}
                         </span>
@@ -181,4 +198,9 @@ export default async function DownloadsPage({ params }: DownloadsPageProps) {
       </div>
     </div>
   )
+}
+
+// tailwind cn helper if not already imported in this file
+function cn(...classes: (string | false | null | undefined)[]) {
+  return classes.filter(Boolean).join(" ")
 }

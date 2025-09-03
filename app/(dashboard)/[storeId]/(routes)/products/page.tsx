@@ -4,35 +4,43 @@ import { format } from "date-fns"
 import type { ProductColumn } from "./_components/columns"
 import { formatter } from "@/lib/utils"
 
-const ProductsPage = async ({ params }: { params: Promise<{ storeId: string }> }) => {
+type RouteParams = Promise<{ storeId: string }>
+
+export default async function ProductsPage({ params }: { params: RouteParams }) {
   const { storeId } = await params
 
   const products = await prismadb.product.findMany({
     where: { storeId },
     include: {
-      category: true,
+      category: { select: { id: true, name: true } },
+      Image: { select: { url: true }, orderBy: { createdAt: "asc" } },
     },
     orderBy: { createdAt: "desc" },
   })
 
-  const categories = await prismadb.category.findMany({
+  // Only fetch the fields you’ll actually pass to a Client Component.
+  const categoriesRaw = await prismadb.category.findMany({
     where: { storeId },
+    select: { id: true, name: true }, // ← avoid Date fields crossing the boundary
     orderBy: { name: "asc" },
   })
 
   const formattedProducts: ProductColumn[] = products.map((item) => ({
     id: item.id,
     name: item.name,
+    imageUrl: (item as any).Image?.[0]?.url ?? null,
     isFeatured: item.isFeatured ? "Yes" : "No",
     isArchived: item.isArchived ? "Yes" : "No",
-    price: formatter.format(item.price.toNumber()),
-    category: item.category.name,
-    categoryId: item.categoryId,
+    price: formatter.format(
+      typeof (item as any).price?.toNumber === "function"
+        ? (item as any).price.toNumber()
+        : Number(item.price)
+    ),
+    category: item.category?.name ?? "—",
+    categoryId: item.category?.id ?? item.categoryId, // safe fallback
     createdAt: format(item.createdAt, "MMMM do, yyyy"),
   }))
 
-  return <ProductClient data={formattedProducts} categories={categories} storeId={storeId}/>
+  // categories are now plain objects (id, name)
+  return <ProductClient data={formattedProducts} categories={categoriesRaw} storeId={storeId} />
 }
-
-export default ProductsPage
-

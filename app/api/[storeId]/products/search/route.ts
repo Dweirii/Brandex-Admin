@@ -1,6 +1,7 @@
 // app/api/[storeId]/products/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import prismadb from "@/lib/prismadb";
+import { Prisma } from "@prisma/client";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } =await params;
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
 
     const categoryIds = matchingCategories.map((category) => category.id);
 
-    const whereClause: any = {
+    const whereClause: Prisma.ProductWhereInput = {
       storeId,
       isArchived: false,
       OR: [
@@ -49,7 +50,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
     };
 
     if (categoryIds.length > 0) {
-      whereClause.OR.push({ categoryId: { in: categoryIds } });
+      whereClause.OR = [
+        ...(whereClause.OR || []),
+        { categoryId: { in: categoryIds } },
+      ];
     }
 
     const [products, total] = await Promise.all([

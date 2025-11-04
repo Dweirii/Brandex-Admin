@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prismadb from "@/lib/prismadb";
+import { Prisma } from "@prisma/client";
 
 // POST: Create a product
 export async function POST(
@@ -128,7 +129,7 @@ export async function GET(
       );
     }
 
-    const whereClause: any = {
+    const whereClause: Prisma.ProductWhereInput = {
       storeId,
       isArchived: false,
     };
@@ -147,23 +148,17 @@ export async function GET(
       whereClause.price = { gt: 0 };
     }
 
-    let orderBy: any = {};
+    let orderBy: Prisma.ProductOrderByWithRelationInput = {};
     
     switch(sortBy) {
       case 'mostPopular':
-        orderBy = { downloadsCount: 'desc'};
+        orderBy = { downloadsCount: 'desc' };
         break;   
       case 'priceLow':
-        orderBy = { price :'asc'};
+        orderBy = { price: 'asc' };
         break;
       case 'priceHigh':
-        orderBy = { price :'desc'};
-        break;
-      case 'nameAsc':
-        orderBy = { name :'asc'};
-        break;
-      case 'nameDesc':
-        orderBy = { name :'desc'};
+        orderBy = { price: 'desc' };
         break;
       case 'newest':
         orderBy = { createdAt :'desc'};

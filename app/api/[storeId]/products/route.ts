@@ -25,7 +25,6 @@ export async function POST(
       keywords,
     } = body;
 
-    // Basic validation
     if (!userId) return new NextResponse("Unauthenticated", { status: 401 });
     if (!name) return new NextResponse("Name is required", { status: 400 });
     if (!Image || !Image.length)
@@ -33,9 +32,8 @@ export async function POST(
     if (!price) return new NextResponse("Price is required", { status: 400 });
     if (!categoryId) return new NextResponse("Category is required", { status: 400 });
     if (!storeId) return new NextResponse("Store ID is required", { status: 400 });
-    // downloadUrl is optional, so we don't validate it here
 
-    // Check if user owns the store
+
     const storeByUserId = await prismadb.store.findFirst({
       where: {
         id: storeId,
@@ -47,7 +45,6 @@ export async function POST(
       return new NextResponse("Unauthorized", { status: 403 });
     }
 
-    // Check for duplicate product name within the same store
     const existingProduct = await prismadb.product.findFirst({
       where: {
         storeId,
@@ -59,7 +56,6 @@ export async function POST(
       return new NextResponse("Product with this name already exists.", { status: 409 });
     }
 
-    // Create product
     const product = await prismadb.product.create({
       data: {
         name: name.trim(),
@@ -100,18 +96,44 @@ export async function GET(
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "12", 10);
 
+    const priceFilter = searchParams.get("priceFilter") || undefined;
+
     if (!storeId) {
       return new NextResponse("Store ID is required", { status: 400 });
     }
 
+    if (priceFilter && !['paid', 'free', 'all'].includes(priceFilter)) {
+      return new NextResponse(
+        JSON.stringify({ error: "Invalid priceFilter. Must be 'free', 'paid', or 'all'" }),
+        { 
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    const whereClause: any = {
+      storeId,
+      isArchived: false,
+    };
+
+    if (categoryId) {
+      whereClause.categoryId = categoryId;
+    }
+
+    if (isFeatured) {
+      whereClause.isFeatured = true;
+    }
+
+    if(priceFilter === "Free") {
+      whereClause.price = {equals: 0}
+    } else if (priceFilter === "Paid") {
+      whereClause.price = { gt: 0 };
+    }
+
     const [products, total] = await Promise.all([
       prismadb.product.findMany({
-        where: {
-          storeId,
-          categoryId,
-          isFeatured: isFeatured ? true : undefined,
-          isArchived: false,
-        },
+        where: whereClause,
         include: {
           Image: true,
           category: true,
@@ -123,20 +145,17 @@ export async function GET(
         take: limit,
       }),
       prismadb.product.count({
-        where: {
-          storeId,
-          categoryId,
-          isFeatured: isFeatured ? true : undefined,
-          isArchived: false,
-        },
+        where: whereClause,
       }),
     ]);
+
+    const pageCount = Math.ceil(total / limit);
 
     return NextResponse.json({
       products,
       total,
       page,
-      pageCount: Math.ceil(total / limit),
+      pageCount,
     });
   } catch (error) {
     console.error("Error in GET--Products", error);
@@ -156,7 +175,6 @@ export async function DELETE(
     if (!userId) return new NextResponse("Unauthenticated", { status: 401 });
     if (!storeId) return new NextResponse("Store ID is required", { status: 400 });
 
-    // Check if user owns the store
     const storeByUserId = await prismadb.store.findFirst({
       where: {
         id: storeId,
@@ -168,7 +186,6 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 403 });
     }
 
-    // Delete all products for the store
     const deleteResult = await prismadb.product.deleteMany({
       where: {
         storeId,

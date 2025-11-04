@@ -94,7 +94,7 @@ export async function GET(
     const categoryId = searchParams.get("categoryId") || undefined;
     const isFeatured = searchParams.get("isFeatured");
     const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "12", 10);
+    const limit = parseInt(searchParams.get("limit") || "24", 10);
 
     const priceFilter = searchParams.get("priceFilter") || undefined;
 
@@ -141,9 +141,9 @@ export async function GET(
       whereClause.isFeatured = true;
     }
 
-    if(priceFilter === "Free") {
+    if(priceFilter === "free") {
       whereClause.price = {equals: 0}
-    } else if (priceFilter === "Paid") {
+    } else if (priceFilter === "paid") {
       whereClause.price = { gt: 0 };
     }
 
@@ -151,7 +151,7 @@ export async function GET(
     
     switch(sortBy) {
       case 'mostPopular':
-        orderBy = { downloadCount: 'desc'};
+        orderBy = { downloadsCount: 'desc'};
         break;   
       case 'priceLow':
         orderBy = { price :'asc'};
@@ -172,7 +172,7 @@ export async function GET(
         orderBy = { createdAt :'asc'};
         break;
       default:
-        orderBy = { downloadCount: 'desc'};
+        orderBy = { downloadsCount: 'desc'};
         break;
     }
 
@@ -183,9 +183,7 @@ export async function GET(
           Image: true,
           category: true,
         },
-        orderBy: {
-          createdAt: "desc",
-        },
+        orderBy: orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -201,6 +199,7 @@ export async function GET(
       total,
       page,
       pageCount,
+      limit,
     });
   } catch (error) {
     console.error("Error in GET--Products", error);

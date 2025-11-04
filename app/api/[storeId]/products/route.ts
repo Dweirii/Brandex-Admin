@@ -98,6 +98,8 @@ export async function GET(
 
     const priceFilter = searchParams.get("priceFilter") || undefined;
 
+    const sortBy = searchParams.get("sortBy") || "mostPopular";
+
     if (!storeId) {
       return new NextResponse("Store ID is required", { status: 400 });
     }
@@ -106,6 +108,20 @@ export async function GET(
       return new NextResponse(
         JSON.stringify({ error: "Invalid priceFilter. Must be 'free', 'paid', or 'all'" }),
         { 
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    const validSortOptions = ['mostPopular', 'priceLow', 'priceHigh', 'nameAsc', 'nameDesc', 'newest', 'oldest'];
+
+    if(sortBy && !validSortOptions.includes(sortBy)) {
+      return new NextResponse(
+        JSON.stringify({
+          error: "Invalid sortBy. Must be one of: " + validSortOptions.join(", ")
+        }),
+        {
           status: 400,
           headers: { "Content-Type": "application/json" }
         }
@@ -129,6 +145,35 @@ export async function GET(
       whereClause.price = {equals: 0}
     } else if (priceFilter === "Paid") {
       whereClause.price = { gt: 0 };
+    }
+
+    let orderBy: any = {};
+    
+    switch(sortBy) {
+      case 'mostPopular':
+        orderBy = { downloadCount: 'desc'};
+        break;   
+      case 'priceLow':
+        orderBy = { price :'asc'};
+        break;
+      case 'priceHigh':
+        orderBy = { price :'desc'};
+        break;
+      case 'nameAsc':
+        orderBy = { name :'asc'};
+        break;
+      case 'nameDesc':
+        orderBy = { name :'desc'};
+        break;
+      case 'newest':
+        orderBy = { createdAt :'desc'};
+        break;
+      case 'oldest':
+        orderBy = { createdAt :'asc'};
+        break;
+      default:
+        orderBy = { downloadCount: 'desc'};
+        break;
     }
 
     const [products, total] = await Promise.all([

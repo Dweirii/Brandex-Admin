@@ -124,9 +124,9 @@ export function SidebarNav({ className, storeSwitcher, userButton, ...props }: S
   return (
     <Sidebar className={cn("border-r", className)} collapsible="icon" {...props}>
       {/* Header with store switcher + collapse button */}
-      <SidebarHeader className="border-b p-4 flex items-center justify-between">
-        <div className="flex-1 overflow-hidden truncate">{storeSwitcher}</div>
-        <div className="hidden md:block">
+      <SidebarHeader className="border-b p-4 flex items-center justify-center gap-2">
+        <div className="flex flex-row overflow-hidden truncate">{storeSwitcher}</div>
+        <div className="hidden md:flex">
           <CollapseButton />
         </div>
         <div className="md:hidden">

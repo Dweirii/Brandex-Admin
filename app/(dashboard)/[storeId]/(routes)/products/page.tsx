@@ -28,11 +28,14 @@ export default async function ProductsPage({ params }: { params: RouteParams }) 
   const formattedProducts: ProductColumn[] = products.map((item) => ({
     id: item.id,
     name: item.name,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     imageUrl: (item as any).Image?.[0]?.url ?? null,
     isFeatured: item.isFeatured ? "Yes" : "No",
     isArchived: item.isArchived ? "Yes" : "No",
     price: formatter.format(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       typeof (item as any).price?.toNumber === "function"
+      //eslint-disable-next-line @typescript-eslint/no-explicit-any
         ? (item as any).price.toNumber()
         : Number(item.price)
     ),

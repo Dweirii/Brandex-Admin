@@ -1,6 +1,12 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 
-export default clerkMiddleware();
+export default clerkMiddleware({
+  publicRoutes: [
+    "/api/test-email",
+    "/api/webhook",
+    "/api/paypal/webhook",
+  ],
+});
 
 export const config = {
   matcher: [

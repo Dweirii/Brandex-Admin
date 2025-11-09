@@ -95,7 +95,7 @@ export async function GET(
     const categoryId = searchParams.get("categoryId") || undefined;
     const isFeatured = searchParams.get("isFeatured");
     const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "24", 10);
+    const limit = parseInt(searchParams.get("limit") || "48", 10);
 
     const priceFilter = searchParams.get("priceFilter") || undefined;
 

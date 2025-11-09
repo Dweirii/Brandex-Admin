@@ -9,7 +9,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
   const query = searchParams.get("query");
 
   const page = parseInt(searchParams.get("page") || "1", 10);
-  const limit = parseInt(searchParams.get("limit") || "24", 10);
+  const limit = parseInt(searchParams.get("limit") || "48", 10);
 
   if (!query || !storeId) {
     return new NextResponse(

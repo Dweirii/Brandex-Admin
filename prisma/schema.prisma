@@ -19,6 +19,7 @@ model Store {
   orders           Order[]
   ProductImportLog ProductImportLog[]
   products         Product[]
+  downloads        Download[]         // New: track downloads per store
 }
 
 model Category {
@@ -53,7 +54,7 @@ model Product {
   description String?
   price       Decimal
   downloadUrl String?
-  downloadsCount  Int  @default(0)
+  downloadsCount  Int  @default(0)  // Keep for backward compatibility - lifetime total
   videoUrl    String?
   keywords    String[]    @default([])
   isFeatured  Boolean     @default(false)
@@ -62,6 +63,7 @@ model Product {
   updatedAt   DateTime    @updatedAt
   Image       Image[]
   OrderItem   OrderItem[]
+  Download    Download[]  // New: track individual downloads
   category    Category    @relation(fields: [categoryId], references: [id])
   store       Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -135,6 +137,25 @@ model OrderItem {
   price     Decimal? @default(0.00)
   order     Order    @relation(fields: [orderId], references: [id])
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Download {
+  id          String   @id @default(uuid())
+  productId   String
+  storeId     String
+  userId      String?  // Optional: logged-in user
+  email       String?  // Optional: user email
+  isFree      Boolean  @default(true)  // Free or paid download
+  createdAt   DateTime @default(now())
+  
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([productId])
+  @@index([createdAt])
+  @@index([isFree])
+  @@map("downloads")
 }
 
 enum ImportStatus {

@@ -4,9 +4,9 @@ import { verifyCustomerToken } from "@/lib/verify-customer-token";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Allow-Credentials": "true",
+  "Access-Control-Allow-Credentials": "false", // Changed to false since we use wildcard origin
 };
 
 export async function OPTIONS(): Promise<Response> {
@@ -68,10 +68,22 @@ export async function GET(
     // Fetch the file from BunnyCDN or any other source
     const fileResponse = await fetch(product.downloadUrl);
 
+    // Update download counter (keep for backward compatibility)
     await prismadb.product.update({
       where: { id: productId },
       data: {
         downloadsCount: { increment: 1 },
+      },
+    });
+
+    // Create download record for period-specific tracking
+    await prismadb.download.create({
+      data: {
+        productId,
+        storeId,
+        userId: null, // TODO: Add user tracking if auth is available
+        email: null,  // TODO: Extract from order/user if available
+        isFree: product.price.equals(0),
       },
     });
 

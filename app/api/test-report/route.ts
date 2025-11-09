@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
 import { sendSummaryReportToAdmin } from "@/lib/email";
-import { getTotalRevenue } from "@/actions/get-total-revenue";
-import { getSalesCount } from "@/actions/get-sales-count";
-import { getTotalDownloads } from "@/actions/get-total-downloads";
 import { getStockCount } from "@/actions/get-stock-count";
 import { getTopDownloadedProducts } from "@/actions/get-topDownloads";
-import { getGraphRevenue } from "@/actions/get-graph-revenue";
-import { getDownloadsAnalytics } from "@/actions/get-download-analytics";
 import { getDownloadsAnalyticsForPeriod } from "@/actions/get-downloads-analytics-for-period";
 import { getBestPerformingProduct } from "@/actions/get-best-performing-product";
 import { getRevenueForPeriod } from "@/actions/get-revenue-for-period";
@@ -78,7 +73,6 @@ export async function GET(req: Request) {
         downloadsAnalytics,
         stockCount,
         topProducts,
-        revenueByMonth,
         bestProduct,
       ] = await Promise.all([
         getRevenueForPeriod(store.id, startDate, endDate),
@@ -86,7 +80,6 @@ export async function GET(req: Request) {
         getDownloadsAnalyticsForPeriod(store.id, startDate, endDate),
         getStockCount(store.id),
         getTopDownloadedProducts(store.id),
-        getGraphRevenue(store.id),
         getBestPerformingProduct(store.id),
       ]);
 
@@ -133,7 +126,7 @@ export async function GET(req: Request) {
             downloadsCount: p.downloadsCount || 0,
             price: p.price.toNumber(),
           })),
-          revenueByMonth: period !== "daily" ? revenueByMonth : undefined,
+          revenueByMonth: undefined,
           revenueGrowth,
           bestPerformingProduct: bestProduct || undefined,
           conversionRate,
@@ -200,7 +193,7 @@ export async function GET(req: Request) {
             downloadsCount: p.downloadsCount || 0,
             price: p.price.toNumber(),
           })),
-          revenueByMonth: period !== "daily" ? revenueByMonth : undefined,
+          revenueByMonth: undefined,
           revenueGrowth,
           bestPerformingProduct: bestProduct || undefined,
           conversionRate,
@@ -266,7 +259,7 @@ export async function GET(req: Request) {
             downloadsCount: p.downloadsCount || 0,
             price: p.price.toNumber(),
           })),
-          revenueByMonth: period !== "daily" ? revenueByMonth : undefined,
+          revenueByMonth: undefined,
           revenueGrowth,
           bestPerformingProduct: bestProduct || undefined,
           conversionRate,

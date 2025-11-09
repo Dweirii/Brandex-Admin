@@ -2,17 +2,31 @@ import { NextResponse } from "next/server";
 import prismadb from "@/lib/prismadb";
 import { verifyCustomerToken } from "@/lib/verify-customer-token";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Allow-Credentials": "false", // Changed to false since we use wildcard origin
+// Dynamic CORS headers based on origin
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigins = [
+    "https://brandexme.com",
+    "https://www.brandexme.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+  ];
+  
+  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : "*";
+  
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Credentials": allowOrigin !== "*" ? "true" : "false",
+    "Access-Control-Max-Age": "86400", // 24 hours
+  };
 };
 
-export async function OPTIONS(): Promise<Response> {
+export async function OPTIONS(req: Request): Promise<Response> {
+  const origin = req.headers.get("origin");
   return new NextResponse(null, {
     status: 204,
-    headers: corsHeaders,
+    headers: getCorsHeaders(origin),
   });
 }
 
@@ -20,6 +34,9 @@ export async function GET(
   req: Request,
   context: { params: Promise<{ storeId: string; productId: string }> }
 ): Promise<Response> {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  
   try {
     const { storeId, productId } = await context.params;
 

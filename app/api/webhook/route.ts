@@ -46,11 +46,19 @@ export async function POST(req: Request) {
 
       console.log("✅ Order marked as paid:", updatedOrder.id);
 
+      // Get actual payment amount from Stripe (amount_total is in cents)
+      const actualPaymentAmount = session.amount_total 
+        ? session.amount_total / 100 
+        : updatedOrder.price?.toNumber() || 0;
+
+      console.log("💰 Payment Amount - Order Price:", updatedOrder.price?.toNumber() || 0);
+      console.log("💰 Payment Amount - Actual Paid (Stripe):", actualPaymentAmount);
+
       const emailData = {
         orderId: updatedOrder.id,
         customerEmail: updatedOrder.email || "unknown@customer.com",
         customerName: session.customer_details?.name ?? undefined,
-        totalAmount: updatedOrder.price?.toNumber() || 0,
+        totalAmount: actualPaymentAmount, // Use actual payment amount
         products: updatedOrder.orderItems.map((item) => ({
           name: item.product.name,
           price: item.product.price.toNumber(),
@@ -61,6 +69,7 @@ export async function POST(req: Request) {
       };
 
       console.log("📧 Sending admin email to:", process.env.ADMIN_EMAIL);
+      console.log("📧 Email will show payment amount: $", actualPaymentAmount.toFixed(2));
       await sendOrderNotificationToAdmin(emailData);
 
     } catch (error) {

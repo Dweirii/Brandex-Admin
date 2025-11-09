@@ -94,12 +94,20 @@ export async function POST(req: Request) {
   });
   console.log(`Order ${orderId} marked paid via PayPal`);
 
+  // Get actual payment amount from PayPal
+  const actualPaymentAmount = event.resource?.amount?.value 
+    ? parseFloat(event.resource.amount.value)
+    : order.price?.toNumber() || 0;
+
+  console.log("💰 Payment Amount - Order Price:", order.price?.toNumber() || 0);
+  console.log("💰 Payment Amount - Actual Paid (PayPal):", actualPaymentAmount);
+
   if (order.email) {
     // Prepare email data
     const emailData = {
       orderId: order.id,
       customerEmail: order.email,
-      totalAmount: order.price?.toNumber() || 0,
+      totalAmount: actualPaymentAmount, // Use actual payment amount
       products: order.orderItems.map(item => ({
         name: item.product.name,
         price: item.product.price.toNumber(),
@@ -110,9 +118,9 @@ export async function POST(req: Request) {
     };
 
     // Send notification to admin
+    console.log("📧 Sending admin email to:", process.env.ADMIN_EMAIL);
+    console.log("📧 Email will show payment amount: $", actualPaymentAmount.toFixed(2));
     await sendOrderNotificationToAdmin(emailData);
-    
-
   }
 
   return NextResponse.json({ message: "OK" }, { status: 200 });

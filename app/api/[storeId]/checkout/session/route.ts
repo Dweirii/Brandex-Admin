@@ -6,14 +6,30 @@ const stripe = new Stripe(process.env.STRIPE_API_KEY!, {
   apiVersion: "2025-02-24.acacia",
 });
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Allow-Credentials": "true",
+// Dynamic CORS headers based on origin
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigins = [
+    "https://brandexme.com",
+    "https://www.brandexme.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+  ];
+  
+  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : "*";
+  
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Credentials": allowOrigin !== "*" ? "true" : "false",
+    "Access-Control-Max-Age": "86400", // 24 hours
+  };
 };
 
 export async function GET(req: Request) {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  
   try {
     const { searchParams } = new URL(req.url);
     const sessionId = searchParams.get("session_id");
@@ -98,9 +114,10 @@ export async function GET(req: Request) {
   }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(req: Request) {
+  const origin = req.headers.get("origin");
   return new NextResponse(null, {
     status: 204,
-    headers: corsHeaders,
+    headers: getCorsHeaders(origin),
   });
 }

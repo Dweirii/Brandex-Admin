@@ -73,18 +73,28 @@ export async function POST(
     }
 
     const authHeader = req.headers.get("authorization");
+    console.log("[CHECKOUT_DEBUG] Authorization header present:", !!authHeader);
+    console.log("[CHECKOUT_DEBUG] Authorization header starts with Bearer:", authHeader?.startsWith("Bearer "));
+    
     if (!authHeader?.startsWith("Bearer ")) {
       console.error("[CHECKOUT_ERROR] Missing or invalid authorization header");
-      return new NextResponse("Unauthorized", { status: 401, headers: corsHeaders });
+      console.error("[CHECKOUT_ERROR] Received header:", authHeader ? "Present but invalid format" : "Missing");
+      return new NextResponse("Unauthorized - Missing or invalid authorization header", { status: 401, headers: corsHeaders });
     }
 
     const token = authHeader.replace("Bearer ", "");
+    console.log("[CHECKOUT_DEBUG] Token extracted, length:", token.length);
+    console.log("[CHECKOUT_DEBUG] Token preview:", token.substring(0, 20) + "...");
     
     let userId;
     try {
+      console.log("[CHECKOUT_DEBUG] Starting token verification...");
       userId = await verifyCustomerToken(token);
+      console.log("[CHECKOUT_DEBUG] Token verified successfully, userId:", userId);
     } catch (tokenError) {
       console.error("[CHECKOUT_ERROR] Token verification failed:", tokenError);
+      console.error("[CHECKOUT_ERROR] Error details:", tokenError instanceof Error ? tokenError.message : String(tokenError));
+      console.error("[CHECKOUT_ERROR] Error stack:", tokenError instanceof Error ? tokenError.stack : "No stack trace");
       return new NextResponse(
         tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
         { 

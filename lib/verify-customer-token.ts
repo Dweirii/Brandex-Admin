@@ -96,7 +96,7 @@ export async function verifyCustomerToken(token: string): Promise<string> {
     
     // Use the token's issuer as-is for verification (it should match what's in the token)
     // The issuer in the token must match exactly what we pass here
-    const verifyIssuer = tokenIssuer || CLERK_ISSUER;
+    const verifyIssuer: string = tokenIssuer || CLERK_ISSUER || `https://${CLERK_INSTANCE_DOMAIN}`;
     
     console.log("[VERIFY_TOKEN] Using issuer for verification:", verifyIssuer);
     

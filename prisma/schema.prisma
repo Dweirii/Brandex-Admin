@@ -8,76 +8,100 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Store {
-  id               String             @id @default(uuid())
-  name             String
-  userId           String
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  billboards       Billboard[]
-  categories       Category[]
-  orders           Order[]
-  ProductImportLog ProductImportLog[]
-  products         Product[]
-  downloads        Download[]         // New: track downloads per store
+model Billboard {
+  id        String     @id
+  storeId   String
+  label     String
+  imageUrl  String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime
+  Store     Store      @relation(fields: [storeId], references: [id])
+  Category  Category[]
 }
 
 model Category {
-  id          String    @id @default(uuid())
+  id          String     @id
   storeId     String
   billboardId String
   name        String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  billboard   Billboard @relation(fields: [billboardId], references: [id])
-  store       Store     @relation(fields: [storeId], references: [id])
-  products    Product[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime
+  Billboard   Billboard  @relation(fields: [billboardId], references: [id])
+  Store       Store      @relation(fields: [storeId], references: [id])
+  products    products[]
 }
 
-model Billboard {
-  id         String     @id @default(uuid())
-  storeId    String
-  label      String
-  imageUrl   String
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  store      Store      @relation(fields: [storeId], references: [id])
-  categories Category[]
+model Image {
+  id        String   @id
+  productId String
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  products  products @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
-/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
-model Product {
-  id          String      @id @default(uuid())
-  storeId     String
-  categoryId  String
-  name        String
-  description String?
-  price       Decimal
-  downloadUrl String?
-  downloadsCount  Int  @default(0)  // Keep for backward compatibility - lifetime total
-  videoUrl    String?
-  keywords    String[]    @default([])
-  isFeatured  Boolean     @default(false)
-  isArchived  Boolean     @default(false)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  Image       Image[]
-  OrderItem   OrderItem[]
-  Download    Download[]  // New: track individual downloads
-  category    Category    @relation(fields: [categoryId], references: [id])
-  store       Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+model Order {
+  id              String      @id
+  userId          String?
+  storeId         String
+  isPaid          Boolean     @default(false)
+  email           String?
+  price           Decimal?    @default(0.00)
+  phone           String?
+  address         String?
+  sessionId       String?     @default("")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime
+  sessionVerified Boolean     @default(false)
+  paymentProvider String?
+  transactionId   String?
+  Store           Store       @relation(fields: [storeId], references: [id])
+  OrderItem       OrderItem[]
+}
 
-  @@unique([storeId, name], name: "storeId_name")
-  @@index([storeId])
-  @@index([categoryId])
-  @@index([isFeatured])
-  @@index([isArchived])
+model OrderItem {
+  id        String   @id
+  orderId   String
+  productId String
+  price     Decimal? @default(0.00)
+  Order     Order    @relation(fields: [orderId], references: [id])
+  products  products @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Store {
+  id                  String                @id
+  name                String
+  userId              String
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  Billboard           Billboard[]
+  Category            Category[]
+  Order               Order[]
+  downloads           downloads[]
+  product_import_logs product_import_logs[]
+  products            products[]
+  subscriptions       subscriptions[]
+}
+
+model downloads {
+  id        String   @id
+  productId String
+  storeId   String
+  userId    String?
+  email     String?
+  isFree    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  products  products @relation(fields: [productId], references: [id], onDelete: Cascade)
+  Store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
   @@index([createdAt])
-  @@map("products")
+  @@index([isFree])
+  @@index([productId])
+  @@index([storeId])
 }
 
-model ProductImportLog {
-  id               String       @id @default(uuid())
+model product_import_logs {
+  id               String       @id
   storeId          String
   userId           String
   fileName         String
@@ -93,69 +117,65 @@ model ProductImportLog {
   startedAt        DateTime?
   completedAt      DateTime?
   metadata         Json?
-  store            Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  Store            Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
+  @@index([createdAt])
+  @@index([status])
   @@index([storeId])
   @@index([userId])
-  @@index([status])
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model products {
+  id             String      @id
+  storeId        String
+  categoryId     String
+  name           String
+  description    String?
+  price          Decimal
+  downloadUrl    String?
+  keywords       String[]    @default([])
+  isFeatured     Boolean     @default(false)
+  isArchived     Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime
+  videoUrl       String?
+  downloadsCount Int         @default(0)
+  Image          Image[]
+  OrderItem      OrderItem[]
+  downloads      downloads[]
+  Category       Category    @relation(fields: [categoryId], references: [id])
+  Store          Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, name])
+  @@index([categoryId])
   @@index([createdAt])
-  @@map("product_import_logs")
-}
-
-model Image {
-  id        String   @id @default(uuid())
-  productId String
-  url       String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-}
-
-model Order {
-  id               String      @id @default(uuid())
-  userId           String?
-  storeId          String
-  isPaid           Boolean     @default(false)
-  email            String?
-  price            Decimal?    @default(0.00)
-  phone            String?
-  address          String?
-  paymentProvider  String?
-  transactionId    String?     
-  sessionId        String?     @default("")
-  sessionVerified  Boolean     @default(false)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  store            Store       @relation(fields: [storeId], references: [id])
-  orderItems       OrderItem[]
-}
-
-model OrderItem {
-  id        String   @id @default(uuid())
-  orderId   String
-  productId String
-  price     Decimal? @default(0.00)
-  order     Order    @relation(fields: [orderId], references: [id])
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-}
-
-model Download {
-  id          String   @id @default(uuid())
-  productId   String
-  storeId     String
-  userId      String?  // Optional: logged-in user
-  email       String?  // Optional: user email
-  isFree      Boolean  @default(true)  // Free or paid download
-  createdAt   DateTime @default(now())
-  
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-
+  @@index([isArchived])
+  @@index([isFeatured])
   @@index([storeId])
-  @@index([productId])
-  @@index([createdAt])
-  @@index([isFree])
-  @@map("downloads")
+}
+
+model subscriptions {
+  id                   String             @id
+  userId               String
+  storeId              String
+  stripeSubscriptionId String?            @unique
+  stripeCustomerId     String?            @unique
+  status               SubscriptionStatus @default(INCOMPLETE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime
+  Store                Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storeId])
+  @@index([status])
+  @@index([storeId])
+  @@index([stripeSubscriptionId])
+  @@index([userId])
 }
 
 enum ImportStatus {
@@ -164,4 +184,13 @@ enum ImportStatus {
   COMPLETED_WITH_ERRORS
   FAILED
   CANCELLED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
+  TRIALING
+  INCOMPLETE
 }

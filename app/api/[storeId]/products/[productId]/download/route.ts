@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prismadb from "@/lib/prismadb";
 import { verifyCustomerToken } from "@/lib/verify-customer-token";
+import { checkSubscriptionAccess } from "@/lib/subscription";
 
 // Dynamic CORS headers based on origin
 const getCorsHeaders = (origin: string | null) => {
@@ -54,28 +55,37 @@ export async function GET(
     // Check if product is free (price is 0)
     const isFreeProduct = product.price.equals(0);
 
+    let userId: string | null = null;
+
     if (!isFreeProduct) {
-      // For paid products, require authentication and payment verification
+      // For paid products, require authentication and access verification
       const authHeader = req.headers.get("authorization");
       if (!authHeader?.startsWith("Bearer ")) {
         return new NextResponse("Unauthorized", { status: 401, headers: corsHeaders });
       }
 
       const token = authHeader.replace("Bearer ", "");
-      const userId = await verifyCustomerToken(token);
+      
+      try {
+        userId = await verifyCustomerToken(token);
+      } catch (tokenError) {
+        console.error("[DOWNLOAD_ERROR] Token verification failed:", tokenError);
+        return new NextResponse("Unauthorized - Invalid or expired token", {
+          status: 401,
+          headers: corsHeaders,
+        });
+      }
 
-      const paidOrders = await prismadb.order.findMany({
-        where: {
+      // Check if user has access via subscription OR purchase
+      const hasAccess = await checkSubscriptionAccess(userId, productId, storeId);
+
+      if (!hasAccess) {
+        console.log("[DOWNLOAD_ERROR] Access denied", {
           userId,
-          isPaid: true,
-          orderItems: {
-            some: { productId },
-          },
-        },
-      });
-
-      if (paidOrders.length === 0) {
-        return new NextResponse("Unauthorized or unpaid", {
+          productId,
+          storeId,
+        });
+        return new NextResponse("Unauthorized - No subscription or purchase found for this product", {
           status: 403,
           headers: corsHeaders,
         });
@@ -98,8 +108,8 @@ export async function GET(
       data: {
         productId,
         storeId,
-        userId: null, // TODO: Add user tracking if auth is available
-        email: null,  // TODO: Extract from order/user if available
+        userId: userId || null, // Include userId if authenticated
+        email: null,  // Can be extracted from order/user if needed in future
         isFree: product.price.equals(0),
       },
     });

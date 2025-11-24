@@ -113,7 +113,7 @@ export async function POST(
     }
 
     console.log("[CHECKOUT_INFO] Fetching products for productIds:", productIds);
-    const products = await prismadb.product.findMany({
+    const products = await prismadb.products.findMany({
       where: {
         id: {
           in: productIds,

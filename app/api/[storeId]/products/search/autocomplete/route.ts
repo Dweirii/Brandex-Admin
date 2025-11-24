@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
     };
 
     // Fetch products matching the prefix
-    const products = await prismadb.product.findMany({
+    const products = await prismadb.products.findMany({
       where: whereClause,
       select: {
         id: true,

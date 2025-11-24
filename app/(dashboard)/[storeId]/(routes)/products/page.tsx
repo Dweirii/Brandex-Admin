@@ -9,7 +9,7 @@ type RouteParams = Promise<{ storeId: string }>
 export default async function ProductsPage({ params }: { params: RouteParams }) {
   const { storeId } = await params
 
-  const products = await prismadb.product.findMany({
+  const products = await prismadb.products.findMany({
     where: { storeId },
     include: {
       category: { select: { id: true, name: true } },

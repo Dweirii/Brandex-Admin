@@ -1,7 +1,7 @@
 import prismadb from "@/lib/prismadb"
 
 export const getTopDownloadedProducts = async (storeId: string) => {
-    const products = await prismadb.product.findMany({
+    const products = await prismadb.products.findMany({
         where: { storeId },
         orderBy: {
             downloadsCount: "desc",

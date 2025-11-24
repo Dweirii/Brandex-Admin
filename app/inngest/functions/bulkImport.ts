@@ -37,7 +37,7 @@ export const bulkImport = inngest.createFunction(
       await step.run(`insert-batch-${i}`, async () => {
         await Promise.all(
           chunk.map(async (row: ProductRow) => {
-            const existing = await prismadb.product.findFirst({
+            const existing = await prismadb.products.findFirst({
               where: {
                 storeId: storeId,
                 name: row.name,
@@ -61,7 +61,7 @@ export const bulkImport = inngest.createFunction(
 
               if (!isDifferent) return;
 
-              await prismadb.product.update({
+              await prismadb.products.update({
                 where: { id: existing.id },
                 data: {
                   description: row.description,
@@ -83,7 +83,7 @@ export const bulkImport = inngest.createFunction(
                 });
               }
             } else {
-              const product = await prismadb.product.create({
+              const product = await prismadb.products.create({
                 data: {
                   name: row.name,
                   description: row.description,

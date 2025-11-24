@@ -2,13 +2,13 @@ import prismadb from "@/lib/prismadb"
 
 export const getDownloadsAnalytics = async (storeId: string) => {
     // Total downloads
-    const { _sum: totalSum } = await prismadb.product.aggregate({
+    const { _sum: totalSum } = await prismadb.products.aggregate({
         where: { storeId },
         _sum: { downloadsCount: true },
     })
 
     // Totlal free downloads
-    const {_sum: freeSum} = await prismadb.product.aggregate({
+    const {_sum: freeSum} = await prismadb.products.aggregate({
         where: {
             storeId,
             price: { equals: 0 },
@@ -17,7 +17,7 @@ export const getDownloadsAnalytics = async (storeId: string) => {
     })
 
     // Total paid downloads
-    const { _sum: paidSum } = await prismadb.product.aggregate({
+    const { _sum: paidSum } = await prismadb.products.aggregate({
         where: {
             storeId,
             price: { gt: 0 },
@@ -26,7 +26,7 @@ export const getDownloadsAnalytics = async (storeId: string) => {
     })
 
     // Most downloaded product
-    const topProduct = await prismadb.product.findFirst({
+    const topProduct = await prismadb.products.findFirst({
         where: { storeId },
         orderBy: {
             downloadsCount: "desc",

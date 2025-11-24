@@ -22,6 +22,13 @@ const nextConfig = {
     ],
   },
 
+  // Suppress excessive request logs in development
+  logging: {
+    fetches: {
+      fullUrl: false,
+    },
+  },
+
 };
 
 module.exports = nextConfig;

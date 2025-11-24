@@ -41,7 +41,6 @@ export async function GET(
     const { storeId } = await context.params;
 
     if (!storeId) {
-      console.error("[SUBSCRIPTION_STATUS_ERROR] Missing storeId");
       return new NextResponse("Store ID is required.", {
         status: 400,
         headers: corsHeaders,
@@ -51,7 +50,6 @@ export async function GET(
     const authHeader = req.headers.get("authorization");
     
     if (!authHeader?.startsWith("Bearer ")) {
-      console.error("[SUBSCRIPTION_STATUS_ERROR] Missing or invalid authorization header");
       return new NextResponse("Unauthorized - Missing or invalid authorization header", {
         status: 401,
         headers: corsHeaders,
@@ -63,9 +61,7 @@ export async function GET(
     let userId: string;
     try {
       userId = await verifyCustomerToken(token);
-      console.log("[SUBSCRIPTION_STATUS_INFO] Token verified successfully, userId:", userId);
     } catch (tokenError) {
-      console.error("[SUBSCRIPTION_STATUS_ERROR] Token verification failed:", tokenError);
       return new NextResponse(
         tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
         { 
@@ -76,7 +72,6 @@ export async function GET(
     }
 
     if (!userId) {
-      console.error("[SUBSCRIPTION_STATUS_ERROR] Token verification returned no userId");
       return new NextResponse("Invalid or expired token", {
         status: 401,
         headers: corsHeaders,
@@ -86,14 +81,17 @@ export async function GET(
     const subscription = await getSubscriptionStatus(userId, storeId);
 
     if (!subscription) {
-      console.log("[SUBSCRIPTION_STATUS_INFO] No subscription found", { userId, storeId });
+      const cacheHeaders = {
+        ...corsHeaders,
+        "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+      };
       return NextResponse.json(
         {
           hasSubscription: false,
           isActive: false,
           subscription: null,
         },
-        { headers: corsHeaders }
+        { headers: cacheHeaders }
       );
     }
 
@@ -141,17 +139,14 @@ export async function GET(
       },
     };
 
-    console.log("[SUBSCRIPTION_STATUS_INFO] Subscription status retrieved", {
-      userId,
-      storeId,
-      subscriptionId: subscription.id,
-      status: subscription.status,
-      isActive,
-    });
+    // Add cache headers to reduce API calls
+    const cacheHeaders = {
+      ...corsHeaders,
+      "Cache-Control": "private, max-age=60, stale-while-revalidate=300", // Cache for 60s, serve stale for 5min
+    };
 
-    return NextResponse.json(response, { headers: corsHeaders });
+    return NextResponse.json(response, { headers: cacheHeaders });
   } catch (error) {
-    console.error("[SUBSCRIPTION_STATUS_ERROR] Unexpected error:", error);
     return new NextResponse(
       error instanceof Error ? error.message : "Internal Server Error",
       { 

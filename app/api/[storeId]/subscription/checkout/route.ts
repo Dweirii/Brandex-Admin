@@ -42,7 +42,6 @@ export async function POST(
     const { storeId } = await context.params;
 
     if (!storeId) {
-      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Missing storeId");
       return new NextResponse("Store ID is required.", {
         status: 400,
         headers: corsHeaders,
@@ -55,7 +54,6 @@ export async function POST(
     });
 
     if (!store) {
-      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Store not found", { storeId });
       return new NextResponse("Store not found.", {
         status: 404,
         headers: corsHeaders,
@@ -66,7 +64,6 @@ export async function POST(
     try {
       body = await req.json();
     } catch (parseError) {
-      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Failed to parse request body:", parseError);
       return new NextResponse("Invalid JSON in request body", {
         status: 400,
         headers: corsHeaders,
@@ -76,7 +73,6 @@ export async function POST(
     const { priceId, email } = body;
 
     if (!priceId || typeof priceId !== "string") {
-      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Missing or invalid priceId");
       return new NextResponse("Price ID is required.", {
         status: 400,
         headers: corsHeaders,
@@ -87,7 +83,6 @@ export async function POST(
     const yearlyPriceId = process.env.STRIPE_PREMIUM_YEARLY_PRICE_ID;
 
     if (!monthlyPriceId || !yearlyPriceId) {
-      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Stripe price IDs not configured");
       return new NextResponse("Subscription pricing not configured.", {
         status: 500,
         headers: corsHeaders,
@@ -95,7 +90,6 @@ export async function POST(
     }
 
     if (priceId !== monthlyPriceId && priceId !== yearlyPriceId) {
-      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Invalid price ID", { priceId });
       return new NextResponse("Invalid price ID.", {
         status: 400,
         headers: corsHeaders,
@@ -103,7 +97,6 @@ export async function POST(
     }
 
     if (!email || typeof email !== "string" || !email.includes("@")) {
-      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Missing or invalid email");
       return new NextResponse("Valid email is required.", {
         status: 400,
         headers: corsHeaders,
@@ -113,7 +106,6 @@ export async function POST(
     const authHeader = req.headers.get("authorization");
     
     if (!authHeader?.startsWith("Bearer ")) {
-      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Missing or invalid authorization header");
       return new NextResponse("Unauthorized - Missing or invalid authorization header", {
         status: 401,
         headers: corsHeaders,
@@ -125,9 +117,7 @@ export async function POST(
     let userId: string;
     try {
       userId = await verifyCustomerToken(token);
-      console.log("[SUBSCRIPTION_CHECKOUT_INFO] Token verified successfully, userId:", userId);
     } catch (tokenError) {
-      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Token verification failed:", tokenError);
       return new NextResponse(
         tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
         { 
@@ -138,7 +128,6 @@ export async function POST(
     }
 
     if (!userId) {
-      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Token verification returned no userId");
       return new NextResponse("Invalid or expired token", {
         status: 401,
         headers: corsHeaders,
@@ -161,11 +150,6 @@ export async function POST(
     if (existingSubscription) {
       const activeStatuses = ["ACTIVE", "TRIALING"];
       if (activeStatuses.includes(existingSubscription.status)) {
-        console.log("[SUBSCRIPTION_CHECKOUT_INFO] User already has active subscription", {
-          userId,
-          storeId,
-          subscriptionId: existingSubscription.id,
-        });
         return new NextResponse("You already have an active subscription.", {
           status: 400,
           headers: corsHeaders,
@@ -173,16 +157,78 @@ export async function POST(
       }
     }
 
-    const frontendUrl = process.env.FRONTEND_STORE_URL || "http://localhost:3000";
-
-    console.log("[SUBSCRIPTION_CHECKOUT_INFO] Creating Stripe checkout session", {
-      userId,
-      storeId,
-      priceId,
-      email,
+    // CREATIVE SOLUTION: Check if user has EVER used a trial before
+    // We look for ANY subscription record with a trialEnd date (meaning they HAD a trial at some point)
+    // This works because:
+    // 1. There's only ONE subscription record per userId+storeId (unique constraint)
+    // 2. Once a trial is used, trialEnd is set and NEVER removed
+    // 3. Even if they cancel and resubscribe, the same record is updated via upsert
+    // 4. So we check: if trialEnd exists (even if null), they've subscribed before = no trial
+    const userSubscriptionRecord = await prismadb.subscriptions.findUnique({
+      where: {
+        userId_storeId: {
+          userId,
+          storeId,
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        trialEnd: true,
+        trialStart: true,
+        createdAt: true,
+      },
     });
 
-    const session = await stripe.checkout.sessions.create({
+    // Creative check: If they have a subscription record (regardless of status), they can't get trial
+    // OR if trialEnd/trialStart was ever set, they already used their trial
+    const userHadTrialBefore = !!userSubscriptionRecord;
+
+    console.log("[SUBSCRIPTION_CHECKOUT_INFO] Checking user subscription history:", {
+      userId,
+      storeId,
+      hadSubscriptionBefore: !!userSubscriptionRecord,
+      lastStatus: userSubscriptionRecord?.status,
+      lastTrialEnd: userSubscriptionRecord?.trialEnd,
+      lastTrialStart: userSubscriptionRecord?.trialStart,
+      userHadTrialBefore,
+    });
+
+    const frontendUrl = process.env.FRONTEND_STORE_URL || "http://localhost:3000";
+
+    // If user has EVER had a subscription (even if canceled/ended), no trial
+    const trialDays = userHadTrialBefore ? undefined : 7;
+
+    console.log("[SUBSCRIPTION_CHECKOUT_INFO] User had subscription/trial before:", userHadTrialBefore);
+    console.log("[SUBSCRIPTION_CHECKOUT_INFO] Trial days:", trialDays);
+    
+    if (userHadTrialBefore) {
+      console.log("[SUBSCRIPTION_CHECKOUT_INFO] ❌ NO TRIAL - User previously had subscription with status:", userSubscriptionRecord?.status);
+      console.log("[SUBSCRIPTION_CHECKOUT_INFO] Previous trial ended:", userSubscriptionRecord?.trialEnd);
+    } else {
+      console.log("[SUBSCRIPTION_CHECKOUT_INFO] ✅ FIRST TIME USER - Will get 7-day free trial");
+    }
+
+    // Build subscription_data - only include trial_period_days if user never had a subscription
+    const subscriptionData: any = {
+      metadata: {
+        userId,
+        storeId,
+        email,
+        hadTrialBefore: userHadTrialBefore.toString(),
+      },
+    };
+
+    // ONLY add trial_period_days if user never had a subscription before
+    if (trialDays && !userHadTrialBefore) {
+      subscriptionData.trial_period_days = trialDays;
+      console.log("[SUBSCRIPTION_CHECKOUT_INFO] ✅ Adding trial period:", trialDays, "days");
+    } else {
+      console.log("[SUBSCRIPTION_CHECKOUT_INFO] ❌ NO TRIAL - User had subscription before, charging immediately");
+    }
+
+    const sessionConfig: any = {
       mode: "subscription",
       line_items: [
         {
@@ -191,16 +237,9 @@ export async function POST(
         },
       ],
       customer_email: email,
-      subscription_data: {
-        trial_period_days: 7,
-        metadata: {
-          userId,
-          storeId,
-          email,
-        },
-      },
-      success_url: `${frontendUrl}/premium?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${frontendUrl}/premium?canceled=true`,
+      subscription_data: subscriptionData,
+      success_url: `${frontendUrl}?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendUrl}?canceled=true`,
       metadata: {
         userId,
         storeId,
@@ -212,26 +251,27 @@ export async function POST(
       phone_number_collection: {
         enabled: true,
       },
-    });
+    };
 
-    console.log("[SUBSCRIPTION_CHECKOUT_INFO] Stripe session created successfully", {
-      sessionId: session.id,
-      url: session.url,
-      userId,
-      storeId,
-    });
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     return NextResponse.json(
       { url: session.url },
       { headers: corsHeaders }
     );
   } catch (error) {
-    console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Unexpected error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
+    
     return new NextResponse(
-      error instanceof Error ? error.message : "Internal Server Error",
+      JSON.stringify({ 
+        error: errorMessage
+      }),
       { 
-        status: 500, 
-        headers: corsHeaders 
+        status: 500,
+        headers: { 
+          ...corsHeaders,
+          "Content-Type": "application/json"
+        }
       }
     );
   }

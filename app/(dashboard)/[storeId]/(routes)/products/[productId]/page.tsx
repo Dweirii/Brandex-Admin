@@ -8,7 +8,7 @@ interface PageProps {
 const ProductPage = async ({ params }: PageProps) => {
     const { productId, storeId } = await params;
 
-    const product = await prismadb.product.findUnique({
+    const product = await prismadb.products.findUnique({
         where: {
             id: productId,
         },

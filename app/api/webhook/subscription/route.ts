@@ -9,7 +9,6 @@ export async function POST(req: Request) {
   const signature = req.headers.get("stripe-signature") as string;
 
   if (!signature) {
-    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Missing stripe-signature header");
     return new NextResponse("Missing signature", { status: 400 });
   }
 
@@ -22,14 +21,11 @@ export async function POST(req: Request) {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (error) {
-    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Webhook signature verification failed:", error);
     return new NextResponse(
       `Webhook Error: ${error instanceof Error ? error.message : "Invalid signature"}`,
       { status: 400 }
     );
   }
-
-  console.log("[SUBSCRIPTION_WEBHOOK_INFO] Received event:", event.type);
 
   try {
     switch (event.type) {
@@ -58,12 +54,12 @@ export async function POST(req: Request) {
         break;
 
       default:
-        console.log("[SUBSCRIPTION_WEBHOOK_INFO] Unhandled event type:", event.type);
+        // Unhandled event type
+        break;
     }
 
     return new NextResponse(null, { status: 200 });
   } catch (error) {
-    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Error processing webhook:", error);
     return new NextResponse(
       `Webhook processing error: ${error instanceof Error ? error.message : "Unknown error"}`,
       { status: 500 }
@@ -76,11 +72,39 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   const storeId = subscription.metadata?.storeId;
 
   if (!userId || !storeId) {
-    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Missing userId or storeId in subscription metadata", {
-      subscriptionId: subscription.id,
-      metadata: subscription.metadata,
-    });
     return;
+  }
+
+  // Check if user had a subscription before (to prevent multiple trials)
+  // If they had one before and this new subscription has a trial, log a warning
+  const existingSubscription = await prismadb.subscriptions.findUnique({
+    where: {
+      userId_storeId: {
+        userId,
+        storeId,
+      },
+    },
+    select: {
+      id: true,
+      status: true,
+      trialEnd: true,
+      stripeSubscriptionId: true,
+      createdAt: true,
+    },
+  });
+
+  // If subscription has trial but user had subscription before (different Stripe subscription), this shouldn't happen
+  // (checkout should have prevented it, but log it as a safeguard)
+  if (subscription.trial_end && existingSubscription && existingSubscription.stripeSubscriptionId !== subscription.id) {
+    console.warn("[SUBSCRIPTION_WEBHOOK_WARNING] ⚠️ User is getting a trial but had subscription before!", {
+      userId,
+      storeId,
+      previousStatus: existingSubscription.status,
+      previousTrialEnd: existingSubscription.trialEnd,
+      previousStripeId: existingSubscription.stripeSubscriptionId,
+      newSubscriptionId: subscription.id,
+      newTrialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+    });
   }
 
   let status: SubscriptionStatus = SubscriptionStatus.INCOMPLETE;
@@ -118,6 +142,17 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   };
 
   try {
+    console.log("[SUBSCRIPTION_WEBHOOK_INFO] Processing subscription.created:", {
+      userId,
+      storeId,
+      stripeSubscriptionId: subscription.id,
+      status: subscription.status,
+      hasTrial: !!subscription.trial_end,
+      hadPreviousSubscription: !!existingSubscription,
+      previousStatus: existingSubscription?.status,
+      previousStripeId: existingSubscription?.stripeSubscriptionId,
+    });
+
     const createdSubscription = await prismadb.subscriptions.upsert({
       where: {
         userId_storeId: {
@@ -130,18 +165,62 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
         id: crypto.randomUUID(),
         updatedAt: new Date(),
       },
-      update: subscriptionData,
+      update: {
+        ...subscriptionData,
+        updatedAt: new Date(), // Force update timestamp
+      },
     });
 
-    console.log("[SUBSCRIPTION_WEBHOOK_INFO] Subscription created/updated", {
-      subscriptionId: createdSubscription.id,
-      stripeSubscriptionId: subscription.id,
-      userId,
-      storeId,
-      status,
+    console.log("[SUBSCRIPTION_WEBHOOK_INFO] ✅ Subscription upserted successfully:", {
+      dbId: createdSubscription.id,
+      dbStatus: createdSubscription.status,
+      dbStripeSubscriptionId: createdSubscription.stripeSubscriptionId,
+      dbCancelAtPeriodEnd: createdSubscription.cancelAtPeriodEnd,
+      wasUpdate: !!existingSubscription,
+      previousStatus: existingSubscription?.status,
+      newStatus: status,
     });
+
+    // Verify the update actually happened
+    const verifyUpdated = await prismadb.subscriptions.findUnique({
+      where: {
+        userId_storeId: {
+          userId,
+          storeId,
+        },
+      },
+      select: {
+        status: true,
+        stripeSubscriptionId: true,
+        cancelAtPeriodEnd: true,
+      },
+    });
+
+    console.log("[SUBSCRIPTION_WEBHOOK_INFO] Verified database state:", {
+      status: verifyUpdated?.status,
+      stripeSubscriptionId: verifyUpdated?.stripeSubscriptionId,
+      cancelAtPeriodEnd: verifyUpdated?.cancelAtPeriodEnd,
+      expectedStatus: status,
+      expectedStripeId: subscription.id,
+      statusMatches: verifyUpdated?.status === status,
+      stripeIdMatches: verifyUpdated?.stripeSubscriptionId === subscription.id,
+    });
+
+    if (verifyUpdated?.status !== status) {
+      console.error("[SUBSCRIPTION_WEBHOOK_ERROR] ❌ Status mismatch after upsert!", {
+        expected: status,
+        actual: verifyUpdated?.status,
+      });
+    }
+
+    if (verifyUpdated?.stripeSubscriptionId !== subscription.id) {
+      console.error("[SUBSCRIPTION_WEBHOOK_ERROR] ❌ Stripe ID mismatch after upsert!", {
+        expected: subscription.id,
+        actual: verifyUpdated?.stripeSubscriptionId,
+      });
+    }
   } catch (error) {
-    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Failed to create subscription record:", error);
+    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Failed to create/update subscription:", error);
     throw error;
   }
 }
@@ -156,9 +235,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   });
 
   if (!existingSubscription) {
-    console.warn("[SUBSCRIPTION_WEBHOOK_WARNING] Subscription not found for update", {
-      stripeSubscriptionId,
-    });
     if (subscription.metadata?.userId && subscription.metadata?.storeId) {
       await handleSubscriptionCreated(subscription);
     }
@@ -204,11 +280,10 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       data: updateData,
     });
 
-    console.log("[SUBSCRIPTION_WEBHOOK_INFO] Subscription updated", {
-      subscriptionId: updatedSubscription.id,
-      stripeSubscriptionId,
-      status,
-      cancelAtPeriodEnd: updatedSubscription.cancelAtPeriodEnd,
+    console.log("[SUBSCRIPTION_WEBHOOK_INFO] Subscription updated:", {
+      id: updatedSubscription.id,
+      status: updateData.status,
+      cancelAtPeriodEnd: updateData.cancelAtPeriodEnd,
     });
   } catch (error) {
     console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Failed to update subscription:", error);
@@ -230,18 +305,12 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       },
     });
 
-    if (updatedSubscription.count === 0) {
-      console.warn("[SUBSCRIPTION_WEBHOOK_WARNING] Subscription not found for deletion", {
-        stripeSubscriptionId,
-      });
-    } else {
-      console.log("[SUBSCRIPTION_WEBHOOK_INFO] Subscription marked as canceled", {
-        stripeSubscriptionId,
-        count: updatedSubscription.count,
-      });
-    }
+    console.log("[SUBSCRIPTION_WEBHOOK_INFO] Subscription deleted/canceled:", {
+      stripeSubscriptionId,
+      updated: updatedSubscription.count,
+    });
   } catch (error) {
-    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Failed to mark subscription as canceled:", error);
+    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Failed to handle subscription deletion:", error);
     throw error;
   }
 }
@@ -262,14 +331,11 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     });
 
     if (!subscription) {
-      console.warn("[SUBSCRIPTION_WEBHOOK_WARNING] Subscription not found for invoice payment", {
-        subscriptionId,
-      });
       return;
     }
 
     if (subscription.status !== SubscriptionStatus.ACTIVE && subscription.status !== SubscriptionStatus.TRIALING) {
-      const updatedSubscription = await prismadb.subscriptions.update({
+      await prismadb.subscriptions.update({
         where: {
           id: subscription.id,
         },
@@ -277,18 +343,8 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
           status: SubscriptionStatus.ACTIVE,
         },
       });
-
-      console.log("[SUBSCRIPTION_WEBHOOK_INFO] Subscription activated after payment", {
-        subscriptionId: updatedSubscription.id,
-        stripeSubscriptionId: subscriptionId,
-      });
-    } else {
-      console.log("[SUBSCRIPTION_WEBHOOK_INFO] Subscription already active, no update needed", {
-        subscriptionId: subscription.id,
-      });
     }
   } catch (error) {
-    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Failed to update subscription after payment:", error);
     throw error;
   }
 }
@@ -309,13 +365,10 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     });
 
     if (!subscription) {
-      console.warn("[SUBSCRIPTION_WEBHOOK_WARNING] Subscription not found for failed payment", {
-        subscriptionId,
-      });
       return;
     }
 
-    const updatedSubscription = await prismadb.subscriptions.update({
+    await prismadb.subscriptions.update({
       where: {
         id: subscription.id,
       },
@@ -323,13 +376,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
         status: SubscriptionStatus.PAST_DUE,
       },
     });
-
-    console.log("[SUBSCRIPTION_WEBHOOK_INFO] Subscription marked as past due", {
-      subscriptionId: updatedSubscription.id,
-      stripeSubscriptionId: subscriptionId,
-    });
   } catch (error) {
-    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Failed to update subscription after failed payment:", error);
     throw error;
   }
 }
@@ -352,22 +399,12 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
     });
 
     if (!dbSubscription) {
-      console.warn("[SUBSCRIPTION_WEBHOOK_WARNING] Subscription not found for trial end reminder", {
-        stripeSubscriptionId,
-      });
       return;
     }
 
     // TODO: Send reminder email to user about trial ending
-    console.log("[SUBSCRIPTION_WEBHOOK_INFO] Trial ending soon - reminder notification", {
-      subscriptionId: dbSubscription.id,
-      userId: dbSubscription.userId,
-      trialEnd: dbSubscription.trialEnd,
-      storeName: dbSubscription.Store?.name,
-    });
   } catch (error) {
-    console.error("[SUBSCRIPTION_WEBHOOK_ERROR] Failed to handle trial end reminder:", error);
-
+    // Silently fail for trial end reminders
   }
 }
 

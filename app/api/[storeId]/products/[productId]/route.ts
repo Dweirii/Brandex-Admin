@@ -15,7 +15,7 @@ export async function GET(
       return new NextResponse("Product id is required", { status: 400 });
     }
 
-    const product = await prismadb.product.findUnique({
+    const product = await prismadb.products.findUnique({
       where: { id: productId },
       include: {
         Image: true,
@@ -66,7 +66,7 @@ export async function PATCH(
     }
 
     // Check if product exists and belongs to the store
-    const existingProduct = await prismadb.product.findFirst({
+    const existingProduct = await prismadb.products.findFirst({
       where: {
         id: productId,
         storeId,
@@ -78,7 +78,7 @@ export async function PATCH(
     }
 
     // Update product
-    const product = await prismadb.product.update({
+    const product = await prismadb.products.update({
       where: {
         id: productId,
       },
@@ -120,7 +120,7 @@ export async function DELETE(
     }
 
     // Check if product exists and belongs to the store
-    const existingProduct = await prismadb.product.findFirst({
+    const existingProduct = await prismadb.products.findFirst({
       where: {
         id: productId,
         storeId,
@@ -132,7 +132,7 @@ export async function DELETE(
     }
 
     // Delete product
-    await prismadb.product.delete({
+    await prismadb.products.delete({
       where: {
         id: productId,
       },

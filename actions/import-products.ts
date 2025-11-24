@@ -95,7 +95,7 @@ export async function importProducts(
     for (let i = 0; i < validatedProducts.length; i += 500) {
       const batch = validatedProducts.slice(i, i + 500)
 
-      await prismadb.product.createMany({
+      await prismadb.products.createMany({
         data: batch.map((product) => ({
           id: crypto.randomUUID(), // Generate UUID for each product
           storeId,

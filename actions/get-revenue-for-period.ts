@@ -15,17 +15,17 @@ export const getRevenueForPeriod = async (
       },
     },
     include: {
-      orderItems: {
+      OrderItem: {
         include: {
-          product: true,
+          products: true,
         },
       },
     },
   });
 
   const totalRevenue = paidOrders.reduce((total, order) => {
-    const orderTotal = order.orderItems.reduce((orderSum, item) => {
-      return orderSum + item.product.price.toNumber();
+    const orderTotal = order.OrderItem.reduce((orderSum, item) => {
+      return orderSum + (item.products?.price.toNumber() || 0);
     }, 0);
     return total + orderTotal;
   }, 0);

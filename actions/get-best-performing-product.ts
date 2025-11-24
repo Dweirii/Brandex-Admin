@@ -2,7 +2,7 @@ import prismadb from "@/lib/prismadb";
 
 export const getBestPerformingProduct = async (storeId: string) => {
   // Get top product by downloads
-  const topProductByDownloads = await prismadb.product.findFirst({
+  const topProductByDownloads = await prismadb.products.findFirst({
     where: { storeId },
     orderBy: {
       downloadsCount: "desc",
@@ -24,27 +24,27 @@ export const getBestPerformingProduct = async (storeId: string) => {
     where: {
       storeId,
       isPaid: true,
-      orderItems: {
+      OrderItem: {
         some: {
           productId: topProductByDownloads.id,
         },
       },
     },
     include: {
-      orderItems: {
+      OrderItem: {
         where: {
           productId: topProductByDownloads.id,
         },
         include: {
-          product: true,
+          products: true,
         },
       },
     },
   });
 
   const productRevenue = ordersWithProduct.reduce((total, order) => {
-    const orderTotal = order.orderItems.reduce((sum, item) => {
-      return sum + item.product.price.toNumber();
+    const orderTotal = order.OrderItem.reduce((sum, item) => {
+      return sum + (item.products?.price.toNumber() || 0);
     }, 0);
     return total + orderTotal;
   }, 0);

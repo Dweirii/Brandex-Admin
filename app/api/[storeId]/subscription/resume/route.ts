@@ -87,7 +87,6 @@ export async function POST(
     const subscription = await getSubscriptionStatus(userId, storeId);
 
     if (!subscription) {
-      console.error("[SUBSCRIPTION_RESUME_ERROR] No subscription found", { userId, storeId });
       return new NextResponse("No subscription found.", {
         status: 404,
         headers: corsHeaders,
@@ -95,11 +94,6 @@ export async function POST(
     }
 
     if (subscription.status === "CANCELED") {
-      console.log("[SUBSCRIPTION_RESUME_ERROR] Cannot resume canceled subscription", {
-        userId,
-        storeId,
-        subscriptionId: subscription.id,
-      });
       return new NextResponse("Cannot resume a canceled subscription. Please create a new subscription.", {
         status: 400,
         headers: corsHeaders,
@@ -107,11 +101,6 @@ export async function POST(
     }
 
     if (!subscription.cancelAtPeriodEnd) {
-      console.log("[SUBSCRIPTION_RESUME_INFO] Subscription is not set to cancel, nothing to resume", {
-        userId,
-        storeId,
-        subscriptionId: subscription.id,
-      });
       return NextResponse.json(
         {
           success: true,
@@ -124,26 +113,12 @@ export async function POST(
 
     if (subscription.stripeSubscriptionId) {
       try {
-        console.log("[SUBSCRIPTION_RESUME_INFO] Resuming Stripe subscription", {
-          stripeSubscriptionId: subscription.stripeSubscriptionId,
-        });
-
         await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
           cancel_at_period_end: false,
         });
-
-        console.log("[SUBSCRIPTION_RESUME_INFO] Stripe subscription resumed successfully");
       } catch (stripeError) {
-        console.error("[SUBSCRIPTION_RESUME_ERROR] Failed to update Stripe subscription:", stripeError);
-        
-        if (stripeError instanceof Error) {
-          console.warn("[SUBSCRIPTION_RESUME_WARNING] Continuing with database update despite Stripe error:", stripeError.message);
-        }
+        // Continue with database update even if Stripe update fails
       }
-    } else {
-      console.warn("[SUBSCRIPTION_RESUME_WARNING] No Stripe subscription ID found, updating database only", {
-        subscriptionId: subscription.id,
-      });
     }
 
     const updatedSubscription = await prismadb.subscriptions.update({
@@ -160,13 +135,6 @@ export async function POST(
         currentPeriodEnd: true,
         updatedAt: true,
       },
-    });
-
-    console.log("[SUBSCRIPTION_RESUME_INFO] Subscription resumed successfully", {
-      userId,
-      storeId,
-      subscriptionId: updatedSubscription.id,
-      currentPeriodEnd: updatedSubscription.currentPeriodEnd,
     });
 
     return NextResponse.json(
@@ -186,7 +154,6 @@ export async function POST(
       { headers: corsHeaders }
     );
   } catch (error) {
-    console.error("[SUBSCRIPTION_RESUME_ERROR] Unexpected error:", error);
     return new NextResponse(
       error instanceof Error ? error.message : "Internal Server Error",
       { 

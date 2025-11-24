@@ -10,7 +10,7 @@ export const getDownloadsForPeriod = async (
   // For a more accurate approach, we'd track individual downloads, but for now
   // we'll use the total downloads count as an approximation
   
-  const { _sum } = await prismadb.product.aggregate({
+  const { _sum } = await prismadb.products.aggregate({
     where: {
       storeId,
       updatedAt: {

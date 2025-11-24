@@ -1,7 +1,7 @@
 import prismadb from "@/lib/prismadb";
 
 export const getTotalDownloads = async (storeId: string) => {
-  const { _sum } = await prismadb.product.aggregate({
+  const { _sum } = await prismadb.products.aggregate({
     where: {
       storeId,
     },

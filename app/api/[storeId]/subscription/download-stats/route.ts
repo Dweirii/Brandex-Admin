@@ -42,7 +42,6 @@ export async function GET(
     const { storeId } = await context.params;
 
     if (!storeId) {
-      console.error("[DOWNLOAD_STATS_ERROR] Missing storeId");
       return new NextResponse("Store ID is required.", {
         status: 400,
         headers: corsHeaders,
@@ -53,7 +52,6 @@ export async function GET(
     const authHeader = req.headers.get("authorization");
     
     if (!authHeader?.startsWith("Bearer ")) {
-      console.error("[DOWNLOAD_STATS_ERROR] Missing or invalid authorization header");
       return new NextResponse("Unauthorized - Missing or invalid authorization header", {
         status: 401,
         headers: corsHeaders,
@@ -65,9 +63,7 @@ export async function GET(
     let userId: string;
     try {
       userId = await verifyCustomerToken(token);
-      console.log("[DOWNLOAD_STATS_INFO] Token verified successfully, userId:", userId);
     } catch (tokenError) {
-      console.error("[DOWNLOAD_STATS_ERROR] Token verification failed:", tokenError);
       return new NextResponse(
         tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
         { 
@@ -78,7 +74,6 @@ export async function GET(
     }
 
     if (!userId) {
-      console.error("[DOWNLOAD_STATS_ERROR] Token verification returned no userId");
       return new NextResponse("Invalid or expired token", {
         status: 401,
         headers: corsHeaders,
@@ -89,7 +84,6 @@ export async function GET(
     const hasSubscription = await hasActiveSubscription(userId, storeId);
 
     if (!hasSubscription) {
-      console.log("[DOWNLOAD_STATS_INFO] User does not have active subscription", { userId, storeId });
       return new NextResponse("Active subscription required to view download statistics.", {
         status: 403,
         headers: corsHeaders,
@@ -129,15 +123,8 @@ export async function GET(
       freeDownloads,
     };
 
-    console.log("[DOWNLOAD_STATS_INFO] Download statistics retrieved", {
-      userId,
-      storeId,
-      stats,
-    });
-
     return NextResponse.json(stats, { headers: corsHeaders });
   } catch (error) {
-    console.error("[DOWNLOAD_STATS_ERROR] Unexpected error:", error);
     return new NextResponse(
       error instanceof Error ? error.message : "Internal Server Error",
       { 

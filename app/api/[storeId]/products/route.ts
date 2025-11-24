@@ -3,11 +3,42 @@ import { auth } from "@clerk/nextjs/server";
 import prismadb from "@/lib/prismadb";
 import { Prisma } from "@prisma/client";
 
+// Dynamic CORS headers based on origin
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigins = [
+    "https://brandexme.com",
+    "https://www.brandexme.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+  ];
+  
+  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : "*";
+  
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Credentials": allowOrigin !== "*" ? "true" : "false",
+    "Access-Control-Max-Age": "86400", // 24 hours
+  };
+};
+
+export async function OPTIONS(req: Request) {
+  const origin = req.headers.get("origin");
+  return new NextResponse(null, {
+    status: 200,
+    headers: getCorsHeaders(origin),
+  });
+}
+
 // POST: Create a product
 export async function POST(
   req: Request,
   context: { params: Promise<{ storeId: string }> }
 ) {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  
   try {
     const { storeId } = await context.params;
     const { userId } = await auth();
@@ -26,13 +57,13 @@ export async function POST(
       keywords,
     } = body;
 
-    if (!userId) return new NextResponse("Unauthenticated", { status: 401 });
-    if (!name) return new NextResponse("Name is required", { status: 400 });
+    if (!userId) return new NextResponse("Unauthenticated", { status: 401, headers: corsHeaders });
+    if (!name) return new NextResponse("Name is required", { status: 400, headers: corsHeaders });
     if (!Image || !Image.length)
-      return new NextResponse("Image URL is required", { status: 400 });
-    if (!price) return new NextResponse("Price is required", { status: 400 });
-    if (!categoryId) return new NextResponse("Category is required", { status: 400 });
-    if (!storeId) return new NextResponse("Store ID is required", { status: 400 });
+      return new NextResponse("Image URL is required", { status: 400, headers: corsHeaders });
+    if (!price) return new NextResponse("Price is required", { status: 400, headers: corsHeaders });
+    if (!categoryId) return new NextResponse("Category is required", { status: 400, headers: corsHeaders });
+    if (!storeId) return new NextResponse("Store ID is required", { status: 400, headers: corsHeaders });
 
 
     const storeByUserId = await prismadb.store.findFirst({
@@ -43,10 +74,10 @@ export async function POST(
     });
 
     if (!storeByUserId) {
-      return new NextResponse("Unauthorized", { status: 403 });
+      return new NextResponse("Unauthorized", { status: 403, headers: corsHeaders });
     }
 
-    const existingProduct = await prismadb.product.findFirst({
+    const existingProduct = await prismadb.products.findFirst({
       where: {
         storeId,
         name: name.trim(),
@@ -54,10 +85,10 @@ export async function POST(
     });
 
     if (existingProduct) {
-      return new NextResponse("Product with this name already exists.", { status: 409 });
+      return new NextResponse("Product with this name already exists.", { status: 409, headers: corsHeaders });
     }
 
-    const product = await prismadb.product.create({
+    const product = await prismadb.products.create({
       data: {
         name: name.trim(),
         price,
@@ -77,10 +108,10 @@ export async function POST(
       },
     });
 
-    return NextResponse.json(product);
+    return NextResponse.json(product, { headers: corsHeaders });
   } catch (error) {
     console.error("Error in POST--Products", error);
-    return new NextResponse("Internal server error", { status: 500 });
+    return new NextResponse("Internal server error", { status: 500, headers: corsHeaders });
   }
 }
 // GET: Retrieve products with pagination
@@ -88,6 +119,9 @@ export async function GET(
   req: Request,
   context: { params: Promise<{ storeId: string }> }
 ) {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  
   try {
     const { storeId } = await context.params;
     const { searchParams } = new URL(req.url);
@@ -102,7 +136,7 @@ export async function GET(
     const sortBy = searchParams.get("sortBy") || "mostPopular";
 
     if (!storeId) {
-      return new NextResponse("Store ID is required", { status: 400 });
+      return new NextResponse("Store ID is required", { status: 400, headers: corsHeaders });
     }
 
     if (priceFilter && !['paid', 'free', 'all'].includes(priceFilter)) {
@@ -110,7 +144,7 @@ export async function GET(
         JSON.stringify({ error: "Invalid priceFilter. Must be 'free', 'paid', or 'all'" }),
         { 
           status: 400,
-          headers: { "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json", ...corsHeaders }
         }
       );
     }
@@ -124,7 +158,7 @@ export async function GET(
         }),
         {
           status: 400,
-          headers: { "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json", ...corsHeaders }
         }
       );
     }
@@ -172,17 +206,17 @@ export async function GET(
     }
 
     const [products, total] = await Promise.all([
-      prismadb.product.findMany({
+      prismadb.products.findMany({
         where: whereClause,
         include: {
           Image: true,
-          category: true,
+          Category: true,
         },
         orderBy: orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),
-      prismadb.product.count({
+      prismadb.products.count({
         where: whereClause,
       }),
     ]);
@@ -195,10 +229,14 @@ export async function GET(
       page,
       pageCount,
       limit,
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("Error in GET--Products", error);
-    return new NextResponse("Internal server error", { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    return new NextResponse(JSON.stringify({ error: errorMessage, details: String(error) }), { 
+      status: 500, 
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    });
   }
 }
 
@@ -207,12 +245,15 @@ export async function DELETE(
   req: Request,
   context: { params: Promise<{ storeId: string }> }
 ) {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  
   try {
     const { storeId } = await context.params;
     const { userId } = await auth();
 
-    if (!userId) return new NextResponse("Unauthenticated", { status: 401 });
-    if (!storeId) return new NextResponse("Store ID is required", { status: 400 });
+    if (!userId) return new NextResponse("Unauthenticated", { status: 401, headers: corsHeaders });
+    if (!storeId) return new NextResponse("Store ID is required", { status: 400, headers: corsHeaders });
 
     const storeByUserId = await prismadb.store.findFirst({
       where: {
@@ -222,10 +263,10 @@ export async function DELETE(
     });
 
     if (!storeByUserId) {
-      return new NextResponse("Unauthorized", { status: 403 });
+      return new NextResponse("Unauthorized", { status: 403, headers: corsHeaders });
     }
 
-    const deleteResult = await prismadb.product.deleteMany({
+    const deleteResult = await prismadb.products.deleteMany({
       where: {
         storeId,
       },
@@ -234,9 +275,9 @@ export async function DELETE(
     return NextResponse.json({
       message: `Successfully deleted ${deleteResult.count} products`,
       deletedCount: deleteResult.count,
-    });
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error("Error in DELETE--Products", error);
-    return new NextResponse("Internal server error", { status: 500 });
+    return new NextResponse("Internal server error", { status: 500, headers: corsHeaders });
   }
 }

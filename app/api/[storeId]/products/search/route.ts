@@ -82,11 +82,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
 
     // Fetch products and total count
     const [allProducts] = await Promise.all([
-      prismadb.product.findMany({
+      prismadb.products.findMany({
         where: whereClause,
         include: {
           Image: true,
-          category: true,
+          Category: true,
         },
       }),
     ]);

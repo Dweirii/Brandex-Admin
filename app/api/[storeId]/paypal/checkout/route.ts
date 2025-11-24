@@ -76,7 +76,7 @@ export async function POST(
       })
     }
 
-    const products = await prismadb.product.findMany({
+    const products = await prismadb.products.findMany({
       where: {
         id: { in: productIds },
         storeId,

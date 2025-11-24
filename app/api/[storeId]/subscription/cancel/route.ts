@@ -3,6 +3,7 @@ import { verifyCustomerToken } from "@/lib/verify-customer-token";
 import { getSubscriptionStatus } from "@/lib/subscription";
 import { stripe } from "@/lib/stripe";
 import prismadb from "@/lib/prismadb";
+import { SubscriptionStatus } from "@prisma/client";
 
 const getCorsHeaders = (origin: string | null) => {
   const allowedOrigins = [
@@ -20,6 +21,7 @@ const getCorsHeaders = (origin: string | null) => {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Credentials": allowOrigin !== "*" ? "true" : "false",
     "Access-Control-Max-Age": "86400", // 24 hours
+    "Content-Type": "application/json",
   };
 };
 
@@ -43,20 +45,32 @@ export async function POST(
 
     if (!storeId) {
       console.error("[SUBSCRIPTION_CANCEL_ERROR] Missing storeId");
-      return new NextResponse("Store ID is required.", {
-        status: 400,
-        headers: corsHeaders,
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Store ID is required.",
+        },
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
     }
 
     const authHeader = req.headers.get("authorization");
     
     if (!authHeader?.startsWith("Bearer ")) {
       console.error("[SUBSCRIPTION_CANCEL_ERROR] Missing or invalid authorization header");
-      return new NextResponse("Unauthorized - Missing or invalid authorization header", {
-        status: 401,
-        headers: corsHeaders,
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unauthorized - Missing or invalid authorization header",
+        },
+        {
+          status: 401,
+          headers: corsHeaders,
+        }
+      );
     }
 
     const token = authHeader.replace("Bearer ", "");
@@ -67,8 +81,11 @@ export async function POST(
       console.log("[SUBSCRIPTION_CANCEL_INFO] Token verified successfully, userId:", userId);
     } catch (tokenError) {
       console.error("[SUBSCRIPTION_CANCEL_ERROR] Token verification failed:", tokenError);
-      return new NextResponse(
-        tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
+      return NextResponse.json(
+        {
+          success: false,
+          message: tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
+        },
         { 
           status: 401, 
           headers: corsHeaders 
@@ -78,28 +95,122 @@ export async function POST(
 
     if (!userId) {
       console.error("[SUBSCRIPTION_CANCEL_ERROR] Token verification returned no userId");
-      return new NextResponse("Invalid or expired token", {
-        status: 401,
-        headers: corsHeaders,
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid or expired token",
+        },
+        {
+          status: 401,
+          headers: corsHeaders,
+        }
+      );
     }
 
     const subscription = await getSubscriptionStatus(userId, storeId);
 
     if (!subscription) {
-      console.error("[SUBSCRIPTION_CANCEL_ERROR] No subscription found", { userId, storeId });
-      return new NextResponse("No active subscription found.", {
-        status: 404,
-        headers: corsHeaders,
-      });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "No active subscription found.",
+        },
+        {
+          status: 404,
+          headers: corsHeaders,
+        }
+      );
     }
 
-    if (subscription.cancelAtPeriodEnd) {
-      console.log("[SUBSCRIPTION_CANCEL_INFO] Subscription already set to cancel at period end", {
-        userId,
-        storeId,
-        subscriptionId: subscription.id,
+    if (subscription.status === "CANCELED") {
+      return NextResponse.json(
+        {
+          success: true,
+          message: "Subscription is already canceled.",
+          status: "CANCELED",
+        },
+        { headers: corsHeaders }
+      );
+    }
+
+    // Check if subscription is in trial period
+    const isInTrial = subscription.status === "TRIALING" && subscription.trialEnd && new Date(subscription.trialEnd) > new Date();
+    
+    console.log("[SUBSCRIPTION_CANCEL_INFO] Subscription details:", {
+      status: subscription.status,
+      isInTrial,
+      trialEnd: subscription.trialEnd,
+      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    });
+
+    // If in trial period, cancel immediately
+    // If in paid period, cancel at period end
+    if (isInTrial) {
+      // Cancel immediately during trial
+      if (subscription.stripeSubscriptionId) {
+        try {
+          await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+          console.log("[SUBSCRIPTION_CANCEL_INFO] Stripe subscription canceled immediately (trial)");
+        } catch (stripeError) {
+          console.error("[SUBSCRIPTION_CANCEL_ERROR] Stripe cancel failed:", stripeError);
+          // Continue with database update even if Stripe update fails
+        }
+      }
+
+      const updatedSubscription = await prismadb.subscriptions.update({
+        where: {
+          id: subscription.id,
+        },
+        data: {
+          status: SubscriptionStatus.CANCELED,
+          cancelAtPeriodEnd: false,
+        },
+        select: {
+          id: true,
+          status: true,
+          cancelAtPeriodEnd: true,
+          currentPeriodEnd: true,
+          updatedAt: true,
+        },
       });
+
+      console.log("[SUBSCRIPTION_CANCEL_INFO] Database updated to CANCELED (trial):", {
+        id: updatedSubscription.id,
+        status: updatedSubscription.status,
+        cancelAtPeriodEnd: updatedSubscription.cancelAtPeriodEnd,
+      });
+
+      // Verify the update
+      const verifySubscription = await prismadb.subscriptions.findUnique({
+        where: { id: subscription.id },
+        select: { status: true, cancelAtPeriodEnd: true },
+      });
+
+      if (!verifySubscription || verifySubscription.status !== SubscriptionStatus.CANCELED) {
+        console.error("[SUBSCRIPTION_CANCEL_ERROR] Database update verification failed!");
+        throw new Error("Failed to update subscription in database");
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: "Trial subscription has been canceled. Access has been removed immediately.",
+          subscription: {
+            id: updatedSubscription.id,
+            status: updatedSubscription.status,
+            cancelAtPeriodEnd: updatedSubscription.cancelAtPeriodEnd,
+            currentPeriodEnd: updatedSubscription.currentPeriodEnd
+              ? new Date(updatedSubscription.currentPeriodEnd).toISOString()
+              : null,
+            updatedAt: new Date(updatedSubscription.updatedAt).toISOString(),
+          },
+        },
+        { headers: corsHeaders }
+      );
+    }
+
+    // Not in trial - cancel at period end
+    if (subscription.cancelAtPeriodEnd) {
       return NextResponse.json(
         {
           success: true,
@@ -113,44 +224,18 @@ export async function POST(
       );
     }
 
-    if (subscription.status === "CANCELED") {
-      console.log("[SUBSCRIPTION_CANCEL_INFO] Subscription already canceled", {
-        userId,
-        storeId,
-        subscriptionId: subscription.id,
-      });
-      return NextResponse.json(
-        {
-          success: true,
-          message: "Subscription is already canceled.",
-          status: "CANCELED",
-        },
-        { headers: corsHeaders }
-      );
-    }
-
     if (subscription.stripeSubscriptionId) {
       try {
-        console.log("[SUBSCRIPTION_CANCEL_INFO] Updating Stripe subscription", {
-          stripeSubscriptionId: subscription.stripeSubscriptionId,
-        });
-
         await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
           cancel_at_period_end: true,
         });
-
-        console.log("[SUBSCRIPTION_CANCEL_INFO] Stripe subscription updated successfully");
+        console.log("[SUBSCRIPTION_CANCEL_INFO] Stripe subscription set to cancel at period end");
       } catch (stripeError) {
-        console.error("[SUBSCRIPTION_CANCEL_ERROR] Failed to update Stripe subscription:", stripeError);
-        
-        if (stripeError instanceof Error) {
-          console.warn("[SUBSCRIPTION_CANCEL_WARNING] Continuing with database update despite Stripe error:", stripeError.message);
-        }
+        console.error("[SUBSCRIPTION_CANCEL_ERROR] Stripe update failed:", stripeError);
+        // Continue with database update even if Stripe update fails
       }
     } else {
-      console.warn("[SUBSCRIPTION_CANCEL_WARNING] No Stripe subscription ID found, updating database only", {
-        subscriptionId: subscription.id,
-      });
+      console.warn("[SUBSCRIPTION_CANCEL_WARNING] No stripeSubscriptionId found, updating database only");
     }
 
     const updatedSubscription = await prismadb.subscriptions.update({
@@ -169,12 +254,24 @@ export async function POST(
       },
     });
 
-    console.log("[SUBSCRIPTION_CANCEL_INFO] Subscription canceled successfully", {
-      userId,
-      storeId,
-      subscriptionId: updatedSubscription.id,
-      currentPeriodEnd: updatedSubscription.currentPeriodEnd,
+    console.log("[SUBSCRIPTION_CANCEL_INFO] Database updated successfully:", {
+      id: updatedSubscription.id,
+      cancelAtPeriodEnd: updatedSubscription.cancelAtPeriodEnd,
+      status: updatedSubscription.status,
     });
+
+    // Verify the update
+    const verifySubscription = await prismadb.subscriptions.findUnique({
+      where: { id: subscription.id },
+      select: { cancelAtPeriodEnd: true },
+    });
+
+    if (!verifySubscription || !verifySubscription.cancelAtPeriodEnd) {
+      console.error("[SUBSCRIPTION_CANCEL_ERROR] Database update verification failed!");
+      throw new Error("Failed to update subscription in database");
+    }
+
+    console.log("[SUBSCRIPTION_CANCEL_INFO] Update verified successfully");
 
     return NextResponse.json(
       {
@@ -194,8 +291,11 @@ export async function POST(
     );
   } catch (error) {
     console.error("[SUBSCRIPTION_CANCEL_ERROR] Unexpected error:", error);
-    return new NextResponse(
-      error instanceof Error ? error.message : "Internal Server Error",
+    return NextResponse.json(
+      {
+        success: false,
+        message: error instanceof Error ? error.message : "Internal Server Error",
+      },
       { 
         status: 500, 
         headers: corsHeaders 

@@ -37,7 +37,6 @@ export async function hasActiveSubscription(
         const isActiveStatus = ACTIVE_SUBSCRIPTION_STATUS.includes(subscription.status);
 
         if (!isActiveStatus) {
-            console.log('Subscription is not active', subscription.status);
             return false;
         }
         
@@ -46,7 +45,6 @@ export async function hasActiveSubscription(
             const trialEnd = new Date(subscription.trialEnd);
 
             if (now > trialEnd) {
-                console.log('Trial period ended', subscription.status);
                 return false;
             }
         }
@@ -56,14 +54,12 @@ export async function hasActiveSubscription(
             const periodEnd = new Date(subscription.currentPeriodEnd);
 
             if (now > periodEnd) {
-                console.log('Subscription period ended', subscription.status);
                 return false;
             }
         }
 
         return true;
     } catch (error) {
-        console.error('Error checking active subscription', error);
         return false;
     }
 }
@@ -74,7 +70,6 @@ export async function getSubscriptionStatus(
   ): Promise<(subscriptions & { Store: { id: string; name: string } }) | null> {
     try {
       if (!userId || !storeId) {
-        console.warn("[SUBSCRIPTION] Missing userId or storeId", { userId, storeId });
         return null;
       }
   
@@ -96,23 +91,11 @@ export async function getSubscriptionStatus(
       });
   
       if (!subscription) {
-        console.log("[SUBSCRIPTION] No subscription found", { userId, storeId });
         return null;
       }
   
-      console.log("[SUBSCRIPTION] Subscription retrieved", {
-        userId,
-        storeId,
-        status: subscription.status,
-      });
-  
       return subscription;
     } catch (error) {
-      console.error("[SUBSCRIPTION] Error getting subscription status", {
-        userId,
-        storeId,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
       return null;
     }
   }
@@ -138,11 +121,6 @@ export async function getSubscriptionStatus(
   ): Promise<boolean> {
     try {
       if (!userId || !productId || !storeId) {
-        console.warn("[SUBSCRIPTION] Missing required parameters", {
-          userId,
-          productId,
-          storeId,
-        });
         return false;
       }
   
@@ -150,11 +128,6 @@ export async function getSubscriptionStatus(
       const hasSubscription = await hasActiveSubscription(userId, storeId);
       
       if (hasSubscription) {
-        console.log("[SUBSCRIPTION] Access granted via subscription", {
-          userId,
-          productId,
-          storeId,
-        });
         return true;
       }
   
@@ -176,29 +149,11 @@ export async function getSubscriptionStatus(
       });
   
       if (purchasedOrder) {
-        console.log("[SUBSCRIPTION] Access granted via purchase", {
-          userId,
-          productId,
-          storeId,
-          orderId: purchasedOrder.id,
-        });
         return true;
       }
   
-      console.log("[SUBSCRIPTION] Access denied - no subscription or purchase", {
-        userId,
-        productId,
-        storeId,
-      });
-  
       return false;
     } catch (error) {
-      console.error("[SUBSCRIPTION] Error checking subscription access", {
-        userId,
-        productId,
-        storeId,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
       // Fail securely: return false on error
       return false;
     }

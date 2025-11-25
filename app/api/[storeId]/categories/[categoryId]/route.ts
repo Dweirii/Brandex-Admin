@@ -19,7 +19,7 @@ export async function GET(
 
     const category = await prismadb.category.findUnique({
       where: { id: categoryId, storeId },
-      include: { billboard: true },
+      include: { Billboard: true },
     });
 
     if (!category) {

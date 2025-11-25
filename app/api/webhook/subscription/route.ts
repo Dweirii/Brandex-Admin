@@ -403,7 +403,7 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
     }
 
     // TODO: Send reminder email to user about trial ending
-  } catch (error) {
+  } catch {
     // Silently fail for trial end reminders
   }
 }

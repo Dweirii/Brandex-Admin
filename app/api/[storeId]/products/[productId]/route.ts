@@ -19,7 +19,7 @@ export async function GET(
       where: { id: productId },
       include: {
         Image: true,
-        category: true,
+        Category: true,
       },
     });
 

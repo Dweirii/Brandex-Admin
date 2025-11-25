@@ -63,9 +63,9 @@ export async function GET(req: Request) {
     const order = await prismadb.order.findUnique({
       where: { id: orderId },
       include: {
-        orderItems: {
+        OrderItem: {
           include: {
-            product: true,
+            products: true,
           },
         },
       },
@@ -90,10 +90,10 @@ export async function GET(req: Request) {
       data: { sessionVerified: true },
     });
 
-    const orderItems = order.orderItems.map((item) => ({
+    const orderItems = order.OrderItem.map((item) => ({
       id: item.id,
       productId: item.productId,
-      productName: item.product.name,
+      productName: item.products.name,
       storeId: order.storeId,
     }));
 

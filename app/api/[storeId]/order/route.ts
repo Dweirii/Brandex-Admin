@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   const orders = await prismadb.order.findMany({
     where: { userId },
     include: {
-      orderItems: { include: { product: true } },
+      OrderItem: { include: { products: true } },
     },
     orderBy: { createdAt: "desc" },
   })

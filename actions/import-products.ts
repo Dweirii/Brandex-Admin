@@ -1,7 +1,7 @@
 "use server"
 
 import { z } from "zod"
-import  prismadb from "@/lib/prismadb"
+import prismadb from "@/lib/prismadb"
 import { revalidatePath } from "next/cache"
 
 // Define the product schema for validation
@@ -97,7 +97,7 @@ export async function importProducts(
 
       await prismadb.products.createMany({
         data: batch.map((product) => ({
-          id: crypto.randomUUID(), // Generate UUID for each product
+          id: crypto.randomUUID(),
           storeId,
           categoryId: product.categoryId,
           name: product.name,
@@ -107,6 +107,7 @@ export async function importProducts(
           downloadUrl: product.downloadUrl,
           isFeatured: product.isFeatured,
           isArchived: product.isArchived,
+          updatedAt: new Date(),
         })),
         skipDuplicates: true,
       })

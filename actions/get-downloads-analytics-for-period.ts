@@ -10,7 +10,7 @@ export const getDownloadsAnalyticsForPeriod = async (
   endDate: Date
 ) => {
   // Total downloads in period
-  const totalDownloads = await prismadb.download.count({
+  const totalDownloads = await prismadb.downloads.count({
     where: {
       storeId,
       createdAt: {
@@ -21,7 +21,7 @@ export const getDownloadsAnalyticsForPeriod = async (
   });
 
   // Free downloads in period
-  const freeDownloads = await prismadb.download.count({
+  const freeDownloads = await prismadb.downloads.count({
     where: {
       storeId,
       isFree: true,
@@ -33,7 +33,7 @@ export const getDownloadsAnalyticsForPeriod = async (
   });
 
   // Paid downloads in period
-  const paidDownloads = await prismadb.download.count({
+  const paidDownloads = await prismadb.downloads.count({
     where: {
       storeId,
       isFree: false,

@@ -28,12 +28,12 @@ export async function verifyCustomerToken(token: string): Promise<string> {
   let decodedToken: JWTPayload | null = null;
   let jwksUrl = CLERK_JWKS_URL;
   let actualIssuerForJWKS = CLERK_INSTANCE_DOMAIN;
-  
+
   try {
     // First, decode the token (without verification) to see what's in it
     try {
       decodedToken = decodeJwt(token);
-    } catch (decodeError) {
+    } catch {
       throw new Error("Invalid token format");
     }
 
@@ -42,21 +42,21 @@ export async function verifyCustomerToken(token: string): Promise<string> {
     }
 
     // Try to get audience from token or use default
-    const tokenAudience = Array.isArray(decodedToken.aud) 
-      ? decodedToken.aud[0] 
+    const tokenAudience = Array.isArray(decodedToken.aud)
+      ? decodedToken.aud[0]
       : decodedToken.aud || process.env.CLERK_JWT_AUDIENCE || "brandex:checkout";
-    
+
     // Get token's issuer and map custom domain to actual Clerk instance
     const tokenIssuer = decodedToken.iss || CLERK_ISSUER;
-    
+
     // If token issuer is the custom domain (any variation), use it directly for JWKS
     // Check for various formats of the custom domain
     const isCustomDomain = tokenIssuer && (
-      tokenIssuer === "https://clerk.brandexme.com" || 
+      tokenIssuer === "https://clerk.brandexme.com" ||
       tokenIssuer === "clerk.brandexme.com" ||
       tokenIssuer.includes("clerk.brandexme.com")
     );
-    
+
     if (isCustomDomain) {
       // Use custom domain directly for JWKS since we verified it works
       actualIssuerForJWKS = "https://clerk.brandexme.com";
@@ -72,18 +72,18 @@ export async function verifyCustomerToken(token: string): Promise<string> {
         // Fallback: use the token issuer as-is, or default to instance domain
         actualIssuerForJWKS = tokenIssuer || `https://${CLERK_INSTANCE_DOMAIN}`;
       }
-      jwksUrl = actualIssuerForJWKS.startsWith('http') 
+      jwksUrl = actualIssuerForJWKS.startsWith('http')
         ? `${actualIssuerForJWKS}/.well-known/jwks.json`
         : `https://${actualIssuerForJWKS}/.well-known/jwks.json`;
     }
-    
+
     // Always use JWKS from the actual Clerk instance
     const jwksToUse = createRemoteJWKSet(new URL(jwksUrl));
-    
+
     // Use the token's issuer as-is for verification (it should match what's in the token)
     // The issuer in the token must match exactly what we pass here
     const verifyIssuer: string = tokenIssuer || CLERK_ISSUER || `https://${CLERK_INSTANCE_DOMAIN}`;
-    
+
     // Verify with token's issuer (custom domain is fine for issuer check)
     // but use actual instance domain for JWKS
     const { payload } = await jwtVerify(token, jwksToUse, {
@@ -94,7 +94,7 @@ export async function verifyCustomerToken(token: string): Promise<string> {
     if (!payload.sub) {
       throw new Error("Missing subject (sub) in token payload");
     }
-    
+
     return payload.sub;
   } catch (error) {
     if (error instanceof Error) {

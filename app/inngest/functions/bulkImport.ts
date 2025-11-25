@@ -79,12 +79,13 @@ export const bulkImport = inngest.createFunction(
               if (row.imageUrl.length) {
                 await prismadb.image.deleteMany({ where: { productId: existing.id } });
                 await prismadb.image.createMany({
-                  data: row.imageUrl.map((url: string) => ({ url, productId: existing.id })),
+                  data: row.imageUrl.map((url: string) => ({ id: crypto.randomUUID(), url, productId: existing.id, updatedAt: new Date() })),
                 });
               }
             } else {
               const product = await prismadb.products.create({
                 data: {
+                  id: crypto.randomUUID(),
                   name: row.name,
                   description: row.description,
                   price: rowPrice,
@@ -95,12 +96,13 @@ export const bulkImport = inngest.createFunction(
                   keywords: row.keywords,
                   videoUrl: row.videoUrl ?? null,
                   storeId: storeId,
+                  updatedAt: new Date(),
                 },
               });
 
               if (row.imageUrl.length) {
                 await prismadb.image.createMany({
-                  data: row.imageUrl.map((url: string) => ({ url, productId: product.id })),
+                  data: row.imageUrl.map((url: string) => ({ id: crypto.randomUUID(), url, productId: product.id, updatedAt: new Date() })),
                 });
               }
             }

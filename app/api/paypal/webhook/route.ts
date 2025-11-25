@@ -71,12 +71,12 @@ export async function POST(req: Request) {
   const order = await prismadb.order.findUnique({ 
     where: { id: orderId },
     include: {
-      orderItems: {
+      OrderItem: {
         include: {
-          product: true,
+          products: true,
         },
       },
-      store: true,
+      Store: true,
     },
   });
   
@@ -108,11 +108,11 @@ export async function POST(req: Request) {
       orderId: order.id,
       customerEmail: order.email,
       totalAmount: actualPaymentAmount, // Use actual payment amount
-      products: order.orderItems.map(item => ({
-        name: item.product.name,
-        price: item.product.price.toNumber(),
+      products: order.OrderItem.map(item => ({
+        name: item.products.name,
+        price: item.products.price.toNumber(),
       })),
-      storeName: order.store.name,
+      storeName: order.Store.name,
       paymentMethod: "PayPal",
       orderDate: order.createdAt,
     };

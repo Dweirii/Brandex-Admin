@@ -35,20 +35,20 @@ export async function POST(req: Request) {
         where: { id: orderId },
         data: { isPaid: true },
         include: {
-          orderItems: {
+          OrderItem: {
             include: {
-              product: true,
+              products: true,
             },
           },
-          store: true,
+          Store: true,
         },
       });
 
       console.log("✅ Order marked as paid:", updatedOrder.id);
 
       // Get actual payment amount from Stripe (amount_total is in cents)
-      const actualPaymentAmount = session.amount_total 
-        ? session.amount_total / 100 
+      const actualPaymentAmount = session.amount_total
+        ? session.amount_total / 100
         : updatedOrder.price?.toNumber() || 0;
 
       console.log("💰 Payment Amount - Order Price:", updatedOrder.price?.toNumber() || 0);
@@ -59,11 +59,11 @@ export async function POST(req: Request) {
         customerEmail: updatedOrder.email || "unknown@customer.com",
         customerName: session.customer_details?.name ?? undefined,
         totalAmount: actualPaymentAmount, // Use actual payment amount
-        products: updatedOrder.orderItems.map((item) => ({
-          name: item.product.name,
-          price: item.product.price.toNumber(),
+        products: updatedOrder.OrderItem.map((item) => ({
+          name: item.products.name,
+          price: item.products.price.toNumber(),
         })),
-        storeName: updatedOrder.store.name,
+        storeName: updatedOrder.Store.name,
         paymentMethod: session.payment_method_types?.[0] ?? "Stripe",
         orderDate: updatedOrder.createdAt,
       };

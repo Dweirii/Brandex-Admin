@@ -3,7 +3,7 @@ import { stripe } from "@/lib/stripe";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { Stripe } from "stripe";
-import { verifyCustomerToken } from "@/lib/verify-customer-token"; 
+import { verifyCustomerToken } from "@/lib/verify-customer-token";
 
 // Dynamic CORS headers based on origin
 const getCorsHeaders = (origin: string | null) => {
@@ -13,9 +13,9 @@ const getCorsHeaders = (origin: string | null) => {
     "http://localhost:3000",
     "http://localhost:3001",
   ];
-  
+
   const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : "*";
-  
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -39,7 +39,7 @@ export async function POST(
 ) {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId } = await context.params;
 
@@ -75,7 +75,7 @@ export async function POST(
     const authHeader = req.headers.get("authorization");
     console.log("[CHECKOUT_DEBUG] Authorization header present:", !!authHeader);
     console.log("[CHECKOUT_DEBUG] Authorization header starts with Bearer:", authHeader?.startsWith("Bearer "));
-    
+
     if (!authHeader?.startsWith("Bearer ")) {
       console.error("[CHECKOUT_ERROR] Missing or invalid authorization header");
       console.error("[CHECKOUT_ERROR] Received header:", authHeader ? "Present but invalid format" : "Missing");
@@ -85,7 +85,7 @@ export async function POST(
     const token = authHeader.replace("Bearer ", "");
     console.log("[CHECKOUT_DEBUG] Token extracted, length:", token.length);
     console.log("[CHECKOUT_DEBUG] Token preview:", token.substring(0, 20) + "...");
-    
+
     let userId;
     try {
       console.log("[CHECKOUT_DEBUG] Starting token verification...");
@@ -97,18 +97,18 @@ export async function POST(
       console.error("[CHECKOUT_ERROR] Error stack:", tokenError instanceof Error ? tokenError.stack : "No stack trace");
       return new NextResponse(
         tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
-        { 
-          status: 401, 
-          headers: corsHeaders 
+        {
+          status: 401,
+          headers: corsHeaders
         }
       );
     }
 
     if (!userId) {
       console.error("[CHECKOUT_ERROR] Token verification returned no userId");
-      return new NextResponse("Invalid or expired token", { 
-        status: 401, 
-        headers: corsHeaders 
+      return new NextResponse("Invalid or expired token", {
+        status: 401,
+        headers: corsHeaders
       });
     }
 
@@ -143,7 +143,7 @@ export async function POST(
     console.log("[CHECKOUT_INFO] Total price (dollars):", totalPrice);
     console.log("[CHECKOUT_INFO] Total price (cents):", totalPrice * 100);
 
-    if(totalPrice < 0.6) {
+    if (totalPrice < 0.6) {
       console.error("[CHECKOUT_ERROR] Price below minimum:", totalPrice);
       return new NextResponse("Minimun payment amount is 0.60", {
         status: 400,
@@ -174,16 +174,18 @@ export async function POST(
     console.log("[CHECKOUT_INFO] Creating order in database");
     const order = await prismadb.order.create({
       data: {
+        id: crypto.randomUUID(),
         storeId,
         isPaid: false,
         email,
-        userId, 
+        userId,
         price: new Prisma.Decimal(totalPrice),
-        orderItems: {
+        OrderItem: {
           create: productIds.map((productId: string) => ({
-            product: { connect: { id: productId } },
+            products: { connect: { id: productId } },
           })),
         },
+        updatedAt: new Date(),
       },
     });
 
@@ -211,15 +213,15 @@ export async function POST(
     console.log("[CHECKOUT_INFO] Stripe session amount_total (dollars):", session.amount_total ? session.amount_total / 100 : "N/A");
     console.log("[CHECKOUT_INFO] Stripe session amount_subtotal (cents):", session.amount_subtotal);
     console.log("[CHECKOUT_INFO] Stripe session amount_subtotal (dollars):", session.amount_subtotal ? session.amount_subtotal / 100 : "N/A");
-    
+
     return NextResponse.json({ url: session.url }, { headers: corsHeaders });
   } catch (error) {
     console.error("[CHECKOUT_ERROR]", error);
     return new NextResponse(
       error instanceof Error ? error.message : "Internal Server Error",
-      { 
-        status: 500, 
-        headers: corsHeaders 
+      {
+        status: 500,
+        headers: corsHeaders
       }
     );
   }

@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
 
     // For autocomplete, we want to find products that start with the query
     // This helps with partial matches like "ca" -> "car", "card", "canvas"
-    const whereClause: Prisma.ProductWhereInput = {
+    const whereClause: Prisma.productsWhereInput = {
       storeId,
       isArchived: false,
       OR: [

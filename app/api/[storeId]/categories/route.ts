@@ -10,9 +10,9 @@ const getCorsHeaders = (origin: string | null) => {
     "http://localhost:3000",
     "http://localhost:3001",
   ];
-  
+
   const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : "*";
-  
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -37,7 +37,7 @@ export async function POST(
 ) {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId } = await context.params; // Await params to access storeId
     const { userId } = await auth();
@@ -63,7 +63,7 @@ export async function POST(
     }
 
     const category = await prismadb.category.create({
-      data: { name, billboardId, storeId },
+      data: { id: crypto.randomUUID(), name, billboardId, storeId, updatedAt: new Date() },
     });
 
     return NextResponse.json(category, { headers: corsHeaders });
@@ -80,7 +80,7 @@ export async function GET(
 ) {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId } = await context.params; // Await params to access storeId
 

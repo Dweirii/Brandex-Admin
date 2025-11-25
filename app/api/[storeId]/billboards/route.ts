@@ -10,9 +10,9 @@ const getCorsHeaders = (origin: string | null) => {
     "http://localhost:3000",
     "http://localhost:3001",
   ];
-  
+
   const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : "*";
-  
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -37,7 +37,7 @@ export async function POST(
 ) {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId } = await context.params; // Await params before destructuring
     const { userId } = await auth();
@@ -73,9 +73,11 @@ export async function POST(
 
     const billboard = await prismadb.billboard.create({
       data: {
+        id: crypto.randomUUID(),
         label,
         imageUrl,
         storeId,
+        updatedAt: new Date(),
       },
     });
 
@@ -93,7 +95,7 @@ export async function GET(
 ) {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId } = await context.params; // Await params before destructuring
 

@@ -20,9 +20,9 @@ const OrdersPage = async ({ params }: PageProps) => {
   const orders = await prismadb.order.findMany({
     where: { storeId },
     include: {
-      orderItems: {
+      OrderItem: {
         include: {
-          product: true,
+          products: true,
         },
       },
     },
@@ -36,9 +36,9 @@ const OrdersPage = async ({ params }: PageProps) => {
     return {
       id: item.id,
       phone: item.phone || "-",
-      address: item.address?? "-",
+      address: item.address ?? "-",
       isPaid: item.isPaid,
-      products: item.orderItems.map((orderItem) => orderItem.product.name).join(", "),
+      products: item.OrderItem.map((orderItem) => orderItem.products.name).join(", "),
       totalPrice: item.price ? formatter.format(item.price.toNumber()) : "N/A",
       createdAt: format(item.createdAt, "MMMM do, yyyy"),
     }

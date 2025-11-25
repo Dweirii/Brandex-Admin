@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
     };
 
     // Build smart search conditions - use contains for initial filtering, then filter by whole words
-    const searchConditions: Prisma.ProductWhereInput[] = [];
+    const searchConditions: Prisma.productsWhereInput[] = [];
 
     // 1. Exact name match (highest priority)
     searchConditions.push({
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
     });
 
     // Build the where clause
-    const whereClause: Prisma.ProductWhereInput = {
+    const whereClause: Prisma.productsWhereInput = {
       storeId,
       isArchived: false,
       OR: searchConditions,

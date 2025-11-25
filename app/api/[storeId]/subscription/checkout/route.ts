@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { verifyCustomerToken } from "@/lib/verify-customer-token";
 import prismadb from "@/lib/prismadb";
-
+import Stripe from "stripe";
 
 const getCorsHeaders = (origin: string | null) => {
   const allowedOrigins = [
@@ -11,9 +11,9 @@ const getCorsHeaders = (origin: string | null) => {
     "http://localhost:3000",
     "http://localhost:3001",
   ];
-  
+
   const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : "*";
-  
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -37,7 +37,7 @@ export async function POST(
 ) {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId } = await context.params;
 
@@ -63,7 +63,7 @@ export async function POST(
     let body;
     try {
       body = await req.json();
-    } catch (parseError) {
+    } catch {
       return new NextResponse("Invalid JSON in request body", {
         status: 400,
         headers: corsHeaders,
@@ -104,7 +104,7 @@ export async function POST(
     }
 
     const authHeader = req.headers.get("authorization");
-    
+
     if (!authHeader?.startsWith("Bearer ")) {
       return new NextResponse("Unauthorized - Missing or invalid authorization header", {
         status: 401,
@@ -113,16 +113,16 @@ export async function POST(
     }
 
     const token = authHeader.replace("Bearer ", "");
-    
+
     let userId: string;
     try {
       userId = await verifyCustomerToken(token);
     } catch (tokenError) {
       return new NextResponse(
         tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
-        { 
-          status: 401, 
-          headers: corsHeaders 
+        {
+          status: 401,
+          headers: corsHeaders
         }
       );
     }
@@ -202,7 +202,7 @@ export async function POST(
 
     console.log("[SUBSCRIPTION_CHECKOUT_INFO] User had subscription/trial before:", userHadTrialBefore);
     console.log("[SUBSCRIPTION_CHECKOUT_INFO] Trial days:", trialDays);
-    
+
     if (userHadTrialBefore) {
       console.log("[SUBSCRIPTION_CHECKOUT_INFO] ❌ NO TRIAL - User previously had subscription with status:", userSubscriptionRecord?.status);
       console.log("[SUBSCRIPTION_CHECKOUT_INFO] Previous trial ended:", userSubscriptionRecord?.trialEnd);
@@ -211,7 +211,7 @@ export async function POST(
     }
 
     // Build subscription_data - only include trial_period_days if user never had a subscription
-    const subscriptionData: any = {
+    const subscriptionData: Stripe.Checkout.SessionCreateParams.SubscriptionData = {
       metadata: {
         userId,
         storeId,
@@ -228,7 +228,7 @@ export async function POST(
       console.log("[SUBSCRIPTION_CHECKOUT_INFO] ❌ NO TRIAL - User had subscription before, charging immediately");
     }
 
-    const sessionConfig: any = {
+    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",
       line_items: [
         {
@@ -261,14 +261,14 @@ export async function POST(
     );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
-    
+
     return new NextResponse(
-      JSON.stringify({ 
+      JSON.stringify({
         error: errorMessage
       }),
-      { 
+      {
         status: 500,
-        headers: { 
+        headers: {
           ...corsHeaders,
           "Content-Type": "application/json"
         }

@@ -11,9 +11,9 @@ const getCorsHeaders = (origin: string | null) => {
     "http://localhost:3000",
     "http://localhost:3001",
   ];
-  
+
   const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : "*";
-  
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -37,7 +37,7 @@ export async function POST(
 ) {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId } = await context.params;
 
@@ -50,7 +50,7 @@ export async function POST(
     }
 
     const authHeader = req.headers.get("authorization");
-    
+
     if (!authHeader?.startsWith("Bearer ")) {
       console.error("[SUBSCRIPTION_RESUME_ERROR] Missing or invalid authorization header");
       return new NextResponse("Unauthorized - Missing or invalid authorization header", {
@@ -60,7 +60,7 @@ export async function POST(
     }
 
     const token = authHeader.replace("Bearer ", "");
-    
+
     let userId: string;
     try {
       userId = await verifyCustomerToken(token);
@@ -69,9 +69,9 @@ export async function POST(
       console.error("[SUBSCRIPTION_RESUME_ERROR] Token verification failed:", tokenError);
       return new NextResponse(
         tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
-        { 
-          status: 401, 
-          headers: corsHeaders 
+        {
+          status: 401,
+          headers: corsHeaders
         }
       );
     }
@@ -116,7 +116,7 @@ export async function POST(
         await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
           cancel_at_period_end: false,
         });
-      } catch (stripeError) {
+      } catch {
         // Continue with database update even if Stripe update fails
       }
     }
@@ -156,9 +156,9 @@ export async function POST(
   } catch (error) {
     return new NextResponse(
       error instanceof Error ? error.message : "Internal Server Error",
-      { 
-        status: 500, 
-        headers: corsHeaders 
+      {
+        status: 500,
+        headers: corsHeaders
       }
     );
   }

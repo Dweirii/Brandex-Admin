@@ -92,7 +92,7 @@ export async function GET(
 
     // Get user's download statistics
     // Total downloads (all downloads by this user for this store)
-    const totalDownloads = await prismadb.download.count({
+    const totalDownloads = await prismadb.downloads.count({
       where: {
         userId,
         storeId,
@@ -100,7 +100,7 @@ export async function GET(
     });
 
     // Premium downloads (paid products downloaded by this user)
-    const premiumDownloads = await prismadb.download.count({
+    const premiumDownloads = await prismadb.downloads.count({
       where: {
         userId,
         storeId,
@@ -109,7 +109,7 @@ export async function GET(
     });
 
     // Free downloads (free products downloaded by this user)
-    const freeDownloads = await prismadb.download.count({
+    const freeDownloads = await prismadb.downloads.count({
       where: {
         userId,
         storeId,

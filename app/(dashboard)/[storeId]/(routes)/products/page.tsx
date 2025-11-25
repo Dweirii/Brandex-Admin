@@ -12,7 +12,7 @@ export default async function ProductsPage({ params }: { params: RouteParams }) 
   const products = await prismadb.products.findMany({
     where: { storeId },
     include: {
-      category: { select: { id: true, name: true } },
+      Category: { select: { id: true, name: true } },
       Image: { select: { url: true }, orderBy: { createdAt: "asc" } },
     },
     orderBy: { createdAt: "desc" },
@@ -35,12 +35,12 @@ export default async function ProductsPage({ params }: { params: RouteParams }) 
     price: formatter.format(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       typeof (item as any).price?.toNumber === "function"
-      //eslint-disable-next-line @typescript-eslint/no-explicit-any
+        //eslint-disable-next-line @typescript-eslint/no-explicit-any
         ? (item as any).price.toNumber()
         : Number(item.price)
     ),
-    category: item.category?.name ?? "—",
-    categoryId: item.category?.id ?? item.categoryId, // safe fallback
+    category: item.Category?.name ?? "—",
+    categoryId: item.Category?.id ?? item.categoryId, // safe fallback
     createdAt: format(item.createdAt, "MMMM do, yyyy"),
   }))
 

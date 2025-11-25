@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import type { Category, Image as ImageType, Product } from "@prisma/client" // Assuming ImageType is from Prisma
+import type { Category, Image as ImageType, products } from "@prisma/client" // Assuming ImageType is from Prisma
 import { Button } from "@/components/ui/button"
 import { Heading } from "@/components/ui/heading"
 import { Separator } from "@/components/ui/separator"
@@ -59,10 +59,10 @@ type ProductFormValues = z.infer<typeof formSchema>
 
 interface ProductFormProps {
   initialData:
-    | (Product & {
-        Image: ImageType[] // Prisma's Image type
-      })
-    | null
+  | (products & {
+    Image: ImageType[] // Prisma's Image type
+  })
+  | null
   categories: Category[]
 }
 
@@ -90,26 +90,26 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
     resolver: zodResolver(formSchema),
     defaultValues: initialData
       ? {
-          ...initialData,
-          price: Number.parseFloat(String(initialData?.price)),
-          image: initialData.Image ? initialData.Image.map((img) => ({ url: img.url })) : [],
-          description: initialData.description || "",
-          downloadUrl: initialData.downloadUrl || "",
-          keywords: initialData.keywords || [],
-          videoUrl: initialData.videoUrl || "",
-        }
+        ...initialData,
+        price: Number.parseFloat(String(initialData?.price)),
+        image: initialData.Image ? initialData.Image.map((img) => ({ url: img.url })) : [],
+        description: initialData.description || "",
+        downloadUrl: initialData.downloadUrl || "",
+        keywords: initialData.keywords || [],
+        videoUrl: initialData.videoUrl || "",
+      }
       : {
-          name: "",
-          description: "",
-          image: [],
-          price: 0,
-          downloadUrl: "",
-          videoUrl: "",
-          categoryId: "",
-          keywords: [],
-          isFeatured: false,
-          isArchived: false,
-        },
+        name: "",
+        description: "",
+        image: [],
+        price: 0,
+        downloadUrl: "",
+        videoUrl: "",
+        categoryId: "",
+        keywords: [],
+        isFeatured: false,
+        isArchived: false,
+      },
   })
 
   const onSubmit = async (data: ProductFormValues) => {
@@ -212,7 +212,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
         setCurrentKeyword("")
       } else {
         toast.error("Keyword already added.")
-        setCurrentKeyword("") 
+        setCurrentKeyword("")
       }
     }
   }
@@ -446,7 +446,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialData, categorie
                                 sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                                 className="object-cover"
                                 onError={(e) => {
-                                  ;(e.target as HTMLImageElement).src = "/placeholder.svg?width=200&height=200"
+                                  ; (e.target as HTMLImageElement).src = "/placeholder.svg?width=200&height=200"
                                 }}
                               />
                               <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">

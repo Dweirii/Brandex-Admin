@@ -11,9 +11,9 @@ const getCorsHeaders = (origin: string | null) => {
     "http://localhost:3000",
     "http://localhost:3001",
   ];
-  
+
   const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : "*";
-  
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
@@ -38,7 +38,7 @@ export async function POST(
 ) {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId } = await context.params;
     const { userId } = await auth();
@@ -90,6 +90,7 @@ export async function POST(
 
     const product = await prismadb.products.create({
       data: {
+        id: crypto.randomUUID(),
         name: name.trim(),
         price,
         categoryId,
@@ -105,6 +106,7 @@ export async function POST(
             data: Image.map((img: { url: string }) => img),
           },
         },
+        updatedAt: new Date(),
       },
     });
 
@@ -121,7 +123,7 @@ export async function GET(
 ) {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId } = await context.params;
     const { searchParams } = new URL(req.url);
@@ -142,7 +144,7 @@ export async function GET(
     if (priceFilter && !['paid', 'free', 'all'].includes(priceFilter)) {
       return new NextResponse(
         JSON.stringify({ error: "Invalid priceFilter. Must be 'free', 'paid', or 'all'" }),
-        { 
+        {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders }
         }
@@ -151,7 +153,7 @@ export async function GET(
 
     const validSortOptions = ['mostPopular', 'priceLow', 'priceHigh', 'nameAsc', 'nameDesc', 'newest', 'oldest'];
 
-    if(sortBy && !validSortOptions.includes(sortBy)) {
+    if (sortBy && !validSortOptions.includes(sortBy)) {
       return new NextResponse(
         JSON.stringify({
           error: "Invalid sortBy. Must be one of: " + validSortOptions.join(", ")
@@ -163,7 +165,7 @@ export async function GET(
       );
     }
 
-    const whereClause: Prisma.ProductWhereInput = {
+    const whereClause: Prisma.productsWhereInput = {
       storeId,
       isArchived: false,
     };
@@ -176,18 +178,18 @@ export async function GET(
       whereClause.isFeatured = true;
     }
 
-    if(priceFilter === "free") {
-      whereClause.price = {equals: 0}
+    if (priceFilter === "free") {
+      whereClause.price = { equals: 0 }
     } else if (priceFilter === "paid") {
       whereClause.price = { gt: 0 };
     }
 
-    let orderBy: Prisma.ProductOrderByWithRelationInput = {};
-    
-    switch(sortBy) {
+    let orderBy: Prisma.productsOrderByWithRelationInput = {};
+
+    switch (sortBy) {
       case 'mostPopular':
         orderBy = { downloadsCount: 'desc' };
-        break;   
+        break;
       case 'priceLow':
         orderBy = { price: 'asc' };
         break;
@@ -195,13 +197,13 @@ export async function GET(
         orderBy = { price: 'desc' };
         break;
       case 'newest':
-        orderBy = { createdAt :'desc'};
+        orderBy = { createdAt: 'desc' };
         break;
       case 'oldest':
-        orderBy = { createdAt :'asc'};
+        orderBy = { createdAt: 'asc' };
         break;
       default:
-        orderBy = { downloadsCount: 'desc'};
+        orderBy = { downloadsCount: 'desc' };
         break;
     }
 
@@ -233,8 +235,8 @@ export async function GET(
   } catch (error) {
     console.error("Error in GET--Products", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return new NextResponse(JSON.stringify({ error: errorMessage, details: String(error) }), { 
-      status: 500, 
+    return new NextResponse(JSON.stringify({ error: errorMessage, details: String(error) }), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
@@ -247,7 +249,7 @@ export async function DELETE(
 ) {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId } = await context.params;
     const { userId } = await auth();

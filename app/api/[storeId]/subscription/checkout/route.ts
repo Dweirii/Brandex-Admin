@@ -93,19 +93,7 @@ export async function POST(
       });
     }
 
-    // Extract email from verified token - this is the ONLY source of truth for user email
-    const email = userData.email;
-    if (!email || !email.includes("@")) {
-      return new NextResponse(
-        "User email not found in authentication token. Please ensure your account has a verified email address.",
-        {
-          status: 400,
-          headers: corsHeaders,
-        }
-      );
-    }
-
-    // Now parse request body for priceId only
+    // Now parse request body
     let body;
     try {
       body = await req.json();
@@ -116,7 +104,28 @@ export async function POST(
       });
     }
 
-    const { priceId } = body;
+    const { priceId, email: bodyEmail } = body;
+
+    // Extract email from verified token - prefer token, fallback to body temporarily
+    // TODO: Remove bodyEmail fallback once Clerk JWT template is updated with email claim
+    const email = userData.email || bodyEmail;
+    
+    if (!email || !email.includes("@")) {
+      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] No email found in token or body", {
+        tokenEmail: userData.email,
+        bodyEmail,
+        userId: userData.userId,
+      });
+      return new NextResponse(
+        "User email not found. Please ensure your account has a verified email address.",
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    console.log("[SUBSCRIPTION_CHECKOUT_INFO] Email source:", userData.email ? "token" : "body (fallback)");
 
     if (!priceId || typeof priceId !== "string") {
       return new NextResponse("Price ID is required.", {

@@ -23,15 +23,6 @@ export const BillboardClient: React.FC<BillboardClientProps> = ({ data, storeId 
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <header className="bg-card border-b px-6 py-4 md:px-8 md:py-6">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-            <ListIcon className="w-5 h-5 md:w-6 md:h-6 text-primary" />
-            <span>Billboards</span>
-          </h1>
-        </div>
-      </header>
-
       <main className="flex-1 p-4 md:p-8">
         <div className="rounded-lg border bg-card shadow-sm transition-all">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between p-4 md:p-6">

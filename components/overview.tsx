@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
@@ -15,7 +16,7 @@ interface OverviewProps {
   description?: string
 }
 
-export function Overview({ data, title = "Overview", description = "Monthly revenue breakdown" }: OverviewProps) {
+export const Overview = memo(function Overview({ data, title = "Overview", description = "Monthly revenue breakdown" }: OverviewProps) {
   const totalRevenue = data.reduce((sum, item) => sum + item.total, 0)
 
   return (
@@ -83,5 +84,5 @@ export function Overview({ data, title = "Overview", description = "Monthly reve
       </CardContent>
     </Card>
   )
-}
+})
 

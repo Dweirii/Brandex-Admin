@@ -8,9 +8,7 @@ import { SidebarNav } from "@/components/sidebar-nav"
 import { cookies } from "next/headers"
 import type { Store } from "@prisma/client"
 
-
 const Navbar = async () => {
-  // Check if user is authenticated
   const { userId } = await auth()
 
   if (!userId) {
@@ -20,22 +18,27 @@ const Navbar = async () => {
   let stores: Store[] = []
 
   try {
-    // Fetch stores for the current user
     stores = await prismadb.store.findMany({
       where: {
         userId,
       },
+      select: {
+        id: true,
+        name: true,
+        userId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
       orderBy: {
-        name: "asc", // Sort stores alphabetically
+        name: "asc",
       },
     })
   } catch (error) {
     console.error("Failed to fetch stores:", error)
   }
 
-  // Get the sidebar state from cookies
   const cookieStore = cookies()
-  let defaultOpen = true // Default to open if cookie is not set
+  let defaultOpen = true
 
   try {
     const sidebarCookie = (await cookieStore).get("sidebar:state")
@@ -47,9 +50,9 @@ const Navbar = async () => {
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <SidebarNav
-        storeSwitcher={<StoreSwitcher items={stores} className="px-2 py-2" />}
+        storeSwitcher={<StoreSwitcher items={stores} />}
         userButton={
-          <div className="flex items-center justify-center p-2">
+          <div className="flex items-center justify-center">
             <UserButton
               afterSignOutUrl="/"
               appearance={{

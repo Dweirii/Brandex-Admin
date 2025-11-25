@@ -2,12 +2,10 @@ import { auth } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 import prismadb from "@/lib/prismadb"
 import { SettingsForm } from "./_components/settings-form"
-import { ModeToggle } from "@/components/theme-toggle"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Settings, Store } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
+import { Store } from "lucide-react"
+
 
 interface SettingsPageProps {
   params: Promise<{ storeId: string }>
@@ -34,26 +32,8 @@ const SettingsPage = async ({ params }: SettingsPageProps) => {
   }
 
   return (
-    <div className="flex-col space-y-6">
-      <div className="flex items-center justify-between px-6 py-4 md:px-8 md:py-6 border-b bg-card">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Link href={`/`}>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <ArrowLeft className="h-4 w-4" />
-                <span className="sr-only">Back to stores</span>
-              </Button>
-            </Link>
-            <h1 className="text-xl font-semibold flex items-center gap-2">
-              <Settings className="h-5 w-5 text-primary" />
-              Store Settings
-            </h1>
-          </div>
-          <p className="text-sm text-muted-foreground">Manage your store preferences and settings</p>
-        </div>
-        <ModeToggle />
-      </div>
-
+    <div className="flex flex-col min-h-screen bg-background">
+      <main className="flex-1 p-4 md:p-8">
       <div className="px-4 md:px-8 pb-8">
         <div className="flex items-center gap-2 mb-6">
           <div className="rounded-full bg-primary/10 p-2">
@@ -80,9 +60,9 @@ const SettingsPage = async ({ params }: SettingsPageProps) => {
           <p>Last updated: {new Date(store.updatedAt).toLocaleDateString()}</p>
         </div>
       </div>
+      </main>
     </div>
-  )
-}
+  );
+};
 
-export default SettingsPage
-
+export default SettingsPage;

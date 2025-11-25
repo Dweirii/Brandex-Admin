@@ -1,26 +1,28 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Roboto_Condensed } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ThemeProvider } from "@/components/theme-provider";
 import { ModalProvider } from "@/providers/modal-provider";
 import { ToasterProvider } from "@/providers/toast-provider";
-import { ThemeProvider } from "@/components/theme-provider";
 
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const robotoCondensed = Roboto_Condensed({
+  variable: "--font-roboto-condensed",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"], // Reduced weights for faster load
+  display: "swap", // Better font loading performance
+  preload: true,
 });
 
 
 export const metadata: Metadata = {
   title: "Dashboard",
   description: "An admin dashboard for Brandex",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 
@@ -32,8 +34,14 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" className="h-full w-full">
+        <head>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+          <link rel="dns-prefetch" href="https://utfs.io" />
+          <link rel="dns-prefetch" href="https://brandex-cdn.b-cdn.net" />
+        </head>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} min-h-screen w-full antialiased bg-background text-foreground flex flex-col`}
+          className={`${robotoCondensed.variable} font-sans min-h-screen w-full antialiased bg-[#141517] text-foreground flex flex-col`}
         >
         <ThemeProvider
             attribute="class"

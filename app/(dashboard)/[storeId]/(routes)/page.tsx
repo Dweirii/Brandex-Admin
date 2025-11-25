@@ -5,8 +5,6 @@ import { getTotalDownloads } from "@/actions/get-total-downloads"
 import { getTotalRevenue } from "@/actions/get-total-revenue"
 import { Overview } from "@/components/overview"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Heading } from "@/components/ui/heading"
-import { Separator } from "@/components/ui/separator"
 import { formatter } from "@/lib/utils"
 import { CreditCard, DollarSign, Download, Package } from "lucide-react"
 
@@ -17,21 +15,18 @@ export default async function DashboardPage({
 }) {
   const { storeId } = await params
 
-  const totalRevenue = await getTotalRevenue(storeId)
-  const salesCount = await getSalesCount(storeId)
-  const stockCount = await getStockCount(storeId)
-  const graphRevenue = await getGraphRevenue(storeId)
-  const totalDownloads = await getTotalDownloads(storeId)
+  // Parallel data fetching for faster page loads
+  const [totalRevenue, salesCount, stockCount, graphRevenue, totalDownloads] = await Promise.all([
+    getTotalRevenue(storeId),
+    getSalesCount(storeId),
+    getStockCount(storeId),
+    getGraphRevenue(storeId),
+    getTotalDownloads(storeId),
+  ])
 
   return (
     <div className="flex-col">
       <div className="flex-1 space-y-6 p-6 pt-6 md:p-8">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <Heading title="Dashboard" description="Overview of your store" />
-          <div className="rounded-lg bg-muted px-3 py-1 text-xs font-medium">Store ID: {storeId}</div>
-        </div>
-        <Separator />
-
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="border-l-4 border-l-primary">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

@@ -9,21 +9,22 @@ type RouteParams = Promise<{ storeId: string }>
 export default async function ProductsPage({ params }: { params: RouteParams }) {
   const { storeId } = await params
 
-  const products = await prismadb.products.findMany({
-    where: { storeId },
-    include: {
-      Category: { select: { id: true, name: true } },
-      Image: { select: { url: true }, orderBy: { createdAt: "asc" } },
-    },
-    orderBy: { createdAt: "desc" },
-  })
-
-  // Only fetch the fields you’ll actually pass to a Client Component.
-  const categoriesRaw = await prismadb.category.findMany({
-    where: { storeId },
-    select: { id: true, name: true }, // ← avoid Date fields crossing the boundary
-    orderBy: { name: "asc" },
-  })
+  // Parallel queries for faster loading
+  const [products, categoriesRaw] = await Promise.all([
+    prismadb.products.findMany({
+      where: { storeId },
+      include: {
+        Category: { select: { id: true, name: true } },
+        Image: { select: { url: true }, orderBy: { createdAt: "asc" }, take: 1 }, // Only first image
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prismadb.category.findMany({
+      where: { storeId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ])
 
   const formattedProducts: ProductColumn[] = products.map((item) => ({
     id: item.id,

@@ -26,6 +26,10 @@ export default async function DashboardLayout({
       id: storeId,
       userId,
     },
+    select: {
+      id: true,
+      name: true,
+    },
   });
 
   if (!store) {

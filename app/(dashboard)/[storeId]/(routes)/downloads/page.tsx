@@ -10,7 +10,6 @@ export default async function DownloadsPage({
 }: {
   params: Promise<{ storeId: string }>
 }) {
-  // Next.js 15: params is a Promise
   const { storeId } = await params
   if (!storeId) notFound()
 
@@ -29,14 +28,6 @@ export default async function DownloadsPage({
 
   return (
     <div className="space-y-8 p-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-          Download Analytics
-        </h2>
-        <p className="text-muted-foreground">Track downloads and revenue across your store</p>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="hover:shadow-lg transition-shadow duration-200 border-l-4 border-l-blue-500">

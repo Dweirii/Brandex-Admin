@@ -1,17 +1,13 @@
-"use client";
-
+"use client"
 
 export default function ContentWithSidebarPadding({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
-
   return (
-    <main
-      className={`transition-all duration-300 ease-in-out w-full`}
-    >
+    <main className="flex-1 w-full overflow-auto">
       {children}
     </main>
-  );
+  )
 }

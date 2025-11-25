@@ -121,9 +121,22 @@ export async function POST(
       },
     });
 
+    console.log("[CHECKOUT_DEBUG] Requested product IDs:", productIds);
+    console.log("[CHECKOUT_DEBUG] Found products:", products.map(p => ({ id: p.id, name: p.name })));
+    console.log("[CHECKOUT_DEBUG] Missing product IDs:", productIds.filter((id: string) => !products.find(p => p.id === id)));
+
     if (products.length === 0) {
-      console.error("[CHECKOUT_ERROR] No products found for the given IDs");
+      console.error("[CHECKOUT_ERROR] No products found for the given IDs:", productIds);
       return new NextResponse("No valid products found", {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    if (products.length !== productIds.length) {
+      const missingIds = productIds.filter((id: string) => !products.find(p => p.id === id));
+      console.error("[CHECKOUT_ERROR] Some products not found. Missing IDs:", missingIds);
+      return new NextResponse(`Products not found: ${missingIds.join(', ')}`, {
         status: 400,
         headers: corsHeaders,
       });
@@ -172,6 +185,10 @@ export async function POST(
     console.log("[CHECKOUT_INFO] Total line items amount (dollars):", totalLineItemsAmount / 100);
 
     console.log("[CHECKOUT_INFO] Creating order in database");
+    console.log("[CHECKOUT_DEBUG] Product IDs to connect:", productIds);
+    console.log("[CHECKOUT_DEBUG] Found products count:", products.length);
+    console.log("[CHECKOUT_DEBUG] Found product IDs:", products.map(p => p.id));
+    
     const order = await prismadb.order.create({
       data: {
         id: crypto.randomUUID(),
@@ -182,7 +199,7 @@ export async function POST(
         price: new Prisma.Decimal(totalPrice),
         OrderItem: {
           create: productIds.map((productId: string) => ({
-            id: crypto.randomUUID(), // Add missing ID for OrderItem
+            id: crypto.randomUUID(),
             products: { connect: { id: productId } },
           })),
         },

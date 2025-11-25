@@ -75,8 +75,8 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     return;
   }
 
-  // Check if user had a subscription before (to prevent multiple trials)
-  // If they had one before and this new subscription has a trial, log a warning
+  // CRITICAL: Detect and prevent unauthorized trials (SECOND LINE OF DEFENSE)
+  // This catches cases where checkout was bypassed or Stripe was accessed directly
   const existingSubscription = await prismadb.subscriptions.findUnique({
     where: {
       userId_storeId: {
@@ -88,22 +88,93 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       id: true,
       status: true,
       trialEnd: true,
+      trialStart: true,
       stripeSubscriptionId: true,
       createdAt: true,
     },
   });
 
-  // If subscription has trial but user had subscription before (different Stripe subscription), this shouldn't happen
-  // (checkout should have prevented it, but log it as a safeguard)
-  if (subscription.trial_end && existingSubscription && existingSubscription.stripeSubscriptionId !== subscription.id) {
-    console.warn("[SUBSCRIPTION_WEBHOOK_WARNING] ⚠️ User is getting a trial but had subscription before!", {
+  // Check metadata from checkout for trial eligibility verification
+  const metadataEligibleForTrial = subscription.metadata?.isEligibleForTrial === "true";
+  const metadataHadTrialBefore = subscription.metadata?.hadTrialBefore === "true";
+
+  // Detect UNAUTHORIZED trial: Stripe subscription has trial but user isn't eligible
+  const hasUnauthorizedTrial = 
+    subscription.trial_end && // Stripe subscription has a trial
+    existingSubscription && // User has previous subscription record
+    (
+      existingSubscription.stripeSubscriptionId !== subscription.id || // Different subscription
+      existingSubscription.trialEnd !== null || // Previously used trial
+      existingSubscription.trialStart !== null || // Previously used trial
+      metadataHadTrialBefore // Metadata confirms they had trial before
+    );
+
+  if (hasUnauthorizedTrial) {
+    console.error("[SUBSCRIPTION_WEBHOOK_TRIAL_VIOLATION] 🚨 UNAUTHORIZED TRIAL DETECTED!", {
       userId,
       storeId,
-      previousStatus: existingSubscription.status,
-      previousTrialEnd: existingSubscription.trialEnd,
-      previousStripeId: existingSubscription.stripeSubscriptionId,
-      newSubscriptionId: subscription.id,
-      newTrialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+      violation: "User receiving trial but not eligible",
+      newSubscription: {
+        id: subscription.id,
+        status: subscription.status,
+        trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+        trialStart: subscription.trial_start ? new Date(subscription.trial_start * 1000) : null,
+      },
+      existingRecord: {
+        id: existingSubscription.id,
+        status: existingSubscription.status,
+        trialEnd: existingSubscription.trialEnd,
+        trialStart: existingSubscription.trialStart,
+        stripeSubscriptionId: existingSubscription.stripeSubscriptionId,
+        createdAt: existingSubscription.createdAt,
+      },
+      metadata: {
+        isEligibleForTrial: metadataEligibleForTrial,
+        hadTrialBefore: metadataHadTrialBefore,
+      },
+    });
+
+    // ACTIVE ENFORCEMENT: Remove the trial immediately via Stripe API
+    try {
+      console.log("[SUBSCRIPTION_WEBHOOK_TRIAL_VIOLATION] Attempting to remove unauthorized trial via Stripe API...");
+      
+      // Update the subscription to remove trial and start billing immediately
+      const updatedStripeSubscription = await stripe.subscriptions.update(subscription.id, {
+        trial_end: "now", // End trial immediately
+        metadata: {
+          ...subscription.metadata,
+          trialRemovedReason: "User not eligible for trial - previous subscription detected",
+          trialRemovedAt: new Date().toISOString(),
+        },
+      });
+
+      console.log("[SUBSCRIPTION_WEBHOOK_TRIAL_VIOLATION] ✅ Successfully removed unauthorized trial:", {
+        subscriptionId: subscription.id,
+        previousTrialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+        newStatus: updatedStripeSubscription.status,
+        newTrialEnd: updatedStripeSubscription.trial_end ? new Date(updatedStripeSubscription.trial_end * 1000) : null,
+      });
+
+      // Update local subscription reference to use the corrected data
+      subscription.trial_end = updatedStripeSubscription.trial_end;
+      subscription.trial_start = updatedStripeSubscription.trial_start;
+      subscription.status = updatedStripeSubscription.status;
+
+    } catch (stripeError) {
+      console.error("[SUBSCRIPTION_WEBHOOK_TRIAL_VIOLATION] ❌ Failed to remove trial via Stripe:", stripeError);
+      
+      // If we can't fix it in Stripe, at least don't save the trial in our database
+      // This is a last-resort safeguard
+      console.warn("[SUBSCRIPTION_WEBHOOK_TRIAL_VIOLATION] Will save subscription without trial data in database");
+    }
+  } else if (subscription.trial_end && existingSubscription) {
+    // Trial exists but it might be legitimate (same subscription being updated)
+    console.log("[SUBSCRIPTION_WEBHOOK_TRIAL_CHECK] Trial detected, verifying legitimacy:", {
+      userId,
+      storeId,
+      isSameSubscription: existingSubscription.stripeSubscriptionId === subscription.id,
+      hadPreviousTrial: !!(existingSubscription.trialEnd || existingSubscription.trialStart),
+      metadataEligibleForTrial,
     });
   }
 
@@ -120,6 +191,11 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     status = SubscriptionStatus.CANCELED;
   }
 
+  // FINAL SAFEGUARD: Don't save trial data for users who already had a trial
+  // This prevents database pollution even if Stripe update failed
+  const shouldStoreTrialData = !existingSubscription || 
+    (!existingSubscription.trialEnd && !existingSubscription.trialStart);
+
   const subscriptionData = {
     userId,
     storeId,
@@ -133,13 +209,26 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       ? new Date(subscription.current_period_end * 1000)
       : null,
     cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
-    trialStart: subscription.trial_start
+    // Only store trial data if user is eligible (never had trial before)
+    trialStart: (shouldStoreTrialData && subscription.trial_start)
       ? new Date(subscription.trial_start * 1000)
       : null,
-    trialEnd: subscription.trial_end
+    trialEnd: (shouldStoreTrialData && subscription.trial_end)
       ? new Date(subscription.trial_end * 1000)
       : null,
   };
+
+  if (!shouldStoreTrialData && (subscription.trial_start || subscription.trial_end)) {
+    console.warn("[SUBSCRIPTION_WEBHOOK_TRIAL_SAFEGUARD] 🛡️ Refusing to store trial data for repeat user:", {
+      userId,
+      storeId,
+      stripeTrialStart: subscription.trial_start,
+      stripeTrialEnd: subscription.trial_end,
+      existingTrialStart: existingSubscription?.trialStart,
+      existingTrialEnd: existingSubscription?.trialEnd,
+      reason: "User already had trial - preventing database pollution",
+    });
+  }
 
   try {
     console.log("[SUBSCRIPTION_WEBHOOK_INFO] Processing subscription.created:", {

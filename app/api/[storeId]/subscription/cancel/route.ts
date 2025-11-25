@@ -146,17 +146,60 @@ export async function POST(
     // If in trial period, cancel immediately
     // If in paid period, cancel at period end
     if (isInTrial) {
-      // Cancel immediately during trial
-      if (subscription.stripeSubscriptionId) {
+      // Cancel immediately during trial - MUST succeed in Stripe first
+      if (!subscription.stripeSubscriptionId) {
+        console.error("[SUBSCRIPTION_CANCEL_ERROR] Missing Stripe subscription ID for trial cancellation");
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Unable to cancel subscription: Missing payment provider information. Please contact support.",
+          },
+          {
+            status: 500,
+            headers: corsHeaders,
+          }
+        );
+      }
+
+      // Attempt Stripe cancellation with retry logic
+      let stripeCancelSucceeded = false;
+      let stripeError: Error | null = null;
+      const MAX_RETRIES = 3;
+
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
           await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
-          console.log("[SUBSCRIPTION_CANCEL_INFO] Stripe subscription canceled immediately (trial)");
-        } catch (stripeError) {
-          console.error("[SUBSCRIPTION_CANCEL_ERROR] Stripe cancel failed:", stripeError);
-          // Continue with database update even if Stripe update fails
+          console.log("[SUBSCRIPTION_CANCEL_INFO] Stripe subscription canceled immediately (trial), attempt:", attempt);
+          stripeCancelSucceeded = true;
+          break;
+        } catch (error) {
+          stripeError = error instanceof Error ? error : new Error("Unknown Stripe error");
+          console.error(`[SUBSCRIPTION_CANCEL_ERROR] Stripe cancel failed (attempt ${attempt}/${MAX_RETRIES}):`, stripeError);
+          
+          // Wait before retry (exponential backoff: 500ms, 1s, 2s)
+          if (attempt < MAX_RETRIES) {
+            await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt - 1)));
+          }
         }
       }
 
+      // If Stripe cancellation failed after retries, fail the request
+      if (!stripeCancelSucceeded) {
+        console.error("[SUBSCRIPTION_CANCEL_ERROR] Stripe cancellation failed after all retries");
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Unable to cancel subscription with payment provider. Please try again later or contact support.",
+            error: stripeError?.message || "Payment provider error",
+          },
+          {
+            status: 502, // Bad Gateway - external service failure
+            headers: corsHeaders,
+          }
+        );
+      }
+
+      // Only update database AFTER Stripe confirms cancellation
       const updatedSubscription = await prismadb.subscriptions.update({
         where: {
           id: subscription.id,
@@ -179,17 +222,6 @@ export async function POST(
         status: updatedSubscription.status,
         cancelAtPeriodEnd: updatedSubscription.cancelAtPeriodEnd,
       });
-
-      // Verify the update
-      const verifySubscription = await prismadb.subscriptions.findUnique({
-        where: { id: subscription.id },
-        select: { status: true, cancelAtPeriodEnd: true },
-      });
-
-      if (!verifySubscription || verifySubscription.status !== SubscriptionStatus.CANCELED) {
-        console.error("[SUBSCRIPTION_CANCEL_ERROR] Database update verification failed!");
-        throw new Error("Failed to update subscription in database");
-      }
 
       return NextResponse.json(
         {
@@ -224,20 +256,62 @@ export async function POST(
       );
     }
 
-    if (subscription.stripeSubscriptionId) {
+    // Update Stripe first, then database
+    if (!subscription.stripeSubscriptionId) {
+      console.error("[SUBSCRIPTION_CANCEL_ERROR] Missing Stripe subscription ID");
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unable to cancel subscription: Missing payment provider information. Please contact support.",
+        },
+        {
+          status: 500,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Attempt Stripe update with retry logic
+    let stripeUpdateSucceeded = false;
+    let stripeError: Error | null = null;
+    const MAX_RETRIES = 3;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
           cancel_at_period_end: true,
         });
-        console.log("[SUBSCRIPTION_CANCEL_INFO] Stripe subscription set to cancel at period end");
-      } catch (stripeError) {
-        console.error("[SUBSCRIPTION_CANCEL_ERROR] Stripe update failed:", stripeError);
-        // Continue with database update even if Stripe update fails
+        console.log(`[SUBSCRIPTION_CANCEL_INFO] Stripe subscription set to cancel at period end (attempt ${attempt})`);
+        stripeUpdateSucceeded = true;
+        break;
+      } catch (error) {
+        stripeError = error instanceof Error ? error : new Error("Unknown Stripe error");
+        console.error(`[SUBSCRIPTION_CANCEL_ERROR] Stripe update failed (attempt ${attempt}/${MAX_RETRIES}):`, stripeError);
+        
+        // Wait before retry (exponential backoff: 500ms, 1s, 2s)
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt - 1)));
+        }
       }
-    } else {
-      console.warn("[SUBSCRIPTION_CANCEL_WARNING] No stripeSubscriptionId found, updating database only");
     }
 
+    // If Stripe update failed after retries, fail the request
+    if (!stripeUpdateSucceeded) {
+      console.error("[SUBSCRIPTION_CANCEL_ERROR] Stripe update failed after all retries");
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unable to cancel subscription with payment provider. Please try again later or contact support.",
+          error: stripeError?.message || "Payment provider error",
+        },
+        {
+          status: 502, // Bad Gateway - external service failure
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Only update database AFTER Stripe confirms the change
     const updatedSubscription = await prismadb.subscriptions.update({
       where: {
         id: subscription.id,
@@ -259,19 +333,6 @@ export async function POST(
       cancelAtPeriodEnd: updatedSubscription.cancelAtPeriodEnd,
       status: updatedSubscription.status,
     });
-
-    // Verify the update
-    const verifySubscription = await prismadb.subscriptions.findUnique({
-      where: { id: subscription.id },
-      select: { cancelAtPeriodEnd: true },
-    });
-
-    if (!verifySubscription || !verifySubscription.cancelAtPeriodEnd) {
-      console.error("[SUBSCRIPTION_CANCEL_ERROR] Database update verification failed!");
-      throw new Error("Failed to update subscription in database");
-    }
-
-    console.log("[SUBSCRIPTION_CANCEL_INFO] Update verified successfully");
 
     return NextResponse.json(
       {

@@ -111,16 +111,62 @@ export async function POST(
       );
     }
 
-    if (subscription.stripeSubscriptionId) {
+    // Update Stripe first, then database
+    if (!subscription.stripeSubscriptionId) {
+      console.error("[SUBSCRIPTION_RESUME_ERROR] Missing Stripe subscription ID");
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unable to resume subscription: Missing payment provider information. Please contact support.",
+        },
+        {
+          status: 500,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Attempt Stripe update with retry logic
+    let stripeUpdateSucceeded = false;
+    let stripeError: Error | null = null;
+    const MAX_RETRIES = 3;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
           cancel_at_period_end: false,
         });
-      } catch {
-        // Continue with database update even if Stripe update fails
+        console.log(`[SUBSCRIPTION_RESUME_INFO] Stripe subscription resumed (attempt ${attempt})`);
+        stripeUpdateSucceeded = true;
+        break;
+      } catch (error) {
+        stripeError = error instanceof Error ? error : new Error("Unknown Stripe error");
+        console.error(`[SUBSCRIPTION_RESUME_ERROR] Stripe update failed (attempt ${attempt}/${MAX_RETRIES}):`, stripeError);
+        
+        // Wait before retry (exponential backoff: 500ms, 1s, 2s)
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt - 1)));
+        }
       }
     }
 
+    // If Stripe update failed after retries, fail the request
+    if (!stripeUpdateSucceeded) {
+      console.error("[SUBSCRIPTION_RESUME_ERROR] Stripe update failed after all retries");
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Unable to resume subscription with payment provider. Please try again later or contact support.",
+          error: stripeError?.message || "Payment provider error",
+        },
+        {
+          status: 502, // Bad Gateway - external service failure
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Only update database AFTER Stripe confirms the change
     const updatedSubscription = await prismadb.subscriptions.update({
       where: {
         id: subscription.id,
@@ -135,6 +181,12 @@ export async function POST(
         currentPeriodEnd: true,
         updatedAt: true,
       },
+    });
+
+    console.log("[SUBSCRIPTION_RESUME_INFO] Database updated successfully:", {
+      id: updatedSubscription.id,
+      cancelAtPeriodEnd: updatedSubscription.cancelAtPeriodEnd,
+      status: updatedSubscription.status,
     });
 
     return NextResponse.json(

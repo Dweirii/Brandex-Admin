@@ -1,8 +1,7 @@
 // /lib/verify-customer-token.ts
 import { createRemoteJWKSet, jwtVerify, decodeJwt, JWTPayload } from "jose";
 
-// Use environment variable for production (clerk.brandexme.com), fallback to dev for local development
-// The custom domain clerk.brandexme.com is just a frontend alias
+
 const CLERK_INSTANCE_DOMAIN = process.env.CLERK_INSTANCE_DOMAIN || "evident-puma-10.clerk.accounts.dev";
 const CLERK_JWKS_URL = process.env.CLERK_JWKS_URL || `https://${CLERK_INSTANCE_DOMAIN}/.well-known/jwks.json`;
 const CLERK_ISSUER = process.env.CLERK_ISSUER || `https://${CLERK_INSTANCE_DOMAIN}`;
@@ -24,7 +23,36 @@ function getJWKS() {
   return jwks;
 }
 
+/**
+ * Verified user data extracted from JWT token
+ */
+export interface VerifiedUserData {
+  userId: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+/**
+ * Verify customer JWT token and return user ID only (backward compatible)
+ * 
+ * @param token - JWT token from Clerk
+ * @returns userId (sub claim)
+ * @throws Error if token is invalid
+ */
 export async function verifyCustomerToken(token: string): Promise<string> {
+  const userData = await verifyCustomerTokenWithData(token);
+  return userData.userId;
+}
+
+/**
+ * Verify customer JWT token and return full user data from token claims
+ * 
+ * @param token - JWT token from Clerk
+ * @returns VerifiedUserData with userId, email, firstName, lastName
+ * @throws Error if token is invalid or missing required claims
+ */
+export async function verifyCustomerTokenWithData(token: string): Promise<VerifiedUserData> {
   let decodedToken: JWTPayload | null = null;
   let jwksUrl = CLERK_JWKS_URL;
   let actualIssuerForJWKS = CLERK_INSTANCE_DOMAIN;
@@ -95,7 +123,19 @@ export async function verifyCustomerToken(token: string): Promise<string> {
       throw new Error("Missing subject (sub) in token payload");
     }
 
-    return payload.sub;
+    // Extract user data from token claims
+    // Clerk typically includes: sub (userId), email, first_name, last_name
+    const userId = payload.sub;
+    const email = typeof payload.email === "string" ? payload.email : null;
+    const firstName = typeof payload.first_name === "string" ? payload.first_name : null;
+    const lastName = typeof payload.last_name === "string" ? payload.last_name : null;
+
+    return {
+      userId,
+      email,
+      firstName,
+      lastName,
+    };
   } catch (error) {
     if (error instanceof Error) {
       // Provide more context for specific errors

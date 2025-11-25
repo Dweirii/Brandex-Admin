@@ -178,6 +178,24 @@ model subscriptions {
   @@index([userId])
 }
 
+model CheckoutSession {
+  id                String    @id
+  userId            String
+  storeId           String
+  priceId           String
+  stripeSessionId   String    @unique
+  stripeSessionUrl  String
+  idempotencyKey    String    @unique
+  expiresAt         DateTime?
+  createdAt         DateTime  @default(now())
+  metadata          Json?
+
+  @@index([userId, storeId, priceId])
+  @@index([createdAt])
+  @@index([idempotencyKey])
+  @@index([stripeSessionId])
+}
+
 enum ImportStatus {
   PROCESSING
   COMPLETED

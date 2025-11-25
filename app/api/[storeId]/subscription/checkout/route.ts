@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { verifyCustomerToken } from "@/lib/verify-customer-token";
+import { verifyCustomerTokenWithData } from "@/lib/verify-customer-token";
 import prismadb from "@/lib/prismadb";
 import Stripe from "stripe";
 
@@ -60,6 +60,52 @@ export async function POST(
       });
     }
 
+    // Verify authentication FIRST before parsing body
+    const authHeader = req.headers.get("authorization");
+
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new NextResponse("Unauthorized - Missing or invalid authorization header", {
+        status: 401,
+        headers: corsHeaders,
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+
+    // Verify token and extract trusted user data
+    let userData;
+    try {
+      userData = await verifyCustomerTokenWithData(token);
+    } catch (tokenError) {
+      return new NextResponse(
+        tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
+        {
+          status: 401,
+          headers: corsHeaders
+        }
+      );
+    }
+
+    if (!userData.userId) {
+      return new NextResponse("Invalid or expired token", {
+        status: 401,
+        headers: corsHeaders,
+      });
+    }
+
+    // Extract email from verified token - this is the ONLY source of truth for user email
+    const email = userData.email;
+    if (!email || !email.includes("@")) {
+      return new NextResponse(
+        "User email not found in authentication token. Please ensure your account has a verified email address.",
+        {
+          status: 400,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    // Now parse request body for priceId only
     let body;
     try {
       body = await req.json();
@@ -70,7 +116,7 @@ export async function POST(
       });
     }
 
-    const { priceId, email } = body;
+    const { priceId } = body;
 
     if (!priceId || typeof priceId !== "string") {
       return new NextResponse("Price ID is required.", {
@@ -96,43 +142,7 @@ export async function POST(
       });
     }
 
-    if (!email || typeof email !== "string" || !email.includes("@")) {
-      return new NextResponse("Valid email is required.", {
-        status: 400,
-        headers: corsHeaders,
-      });
-    }
-
-    const authHeader = req.headers.get("authorization");
-
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new NextResponse("Unauthorized - Missing or invalid authorization header", {
-        status: 401,
-        headers: corsHeaders,
-      });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-
-    let userId: string;
-    try {
-      userId = await verifyCustomerToken(token);
-    } catch (tokenError) {
-      return new NextResponse(
-        tokenError instanceof Error ? `Token verification failed: ${tokenError.message}` : "Invalid or expired token",
-        {
-          status: 401,
-          headers: corsHeaders
-        }
-      );
-    }
-
-    if (!userId) {
-      return new NextResponse("Invalid or expired token", {
-        status: 401,
-        headers: corsHeaders,
-      });
-    }
+    const userId = userData.userId;
 
     const existingSubscription = await prismadb.subscriptions.findUnique({
       where: {
@@ -157,13 +167,8 @@ export async function POST(
       }
     }
 
-    // CREATIVE SOLUTION: Check if user has EVER used a trial before
-    // We look for ANY subscription record with a trialEnd date (meaning they HAD a trial at some point)
-    // This works because:
-    // 1. There's only ONE subscription record per userId+storeId (unique constraint)
-    // 2. Once a trial is used, trialEnd is set and NEVER removed
-    // 3. Even if they cancel and resubscribe, the same record is updated via upsert
-    // 4. So we check: if trialEnd exists (even if null), they've subscribed before = no trial
+    // CRITICAL: Prevent multiple trials - check user's subscription history
+    // This is the FIRST LINE OF DEFENSE against trial abuse
     const userSubscriptionRecord = await prismadb.subscriptions.findUnique({
       where: {
         userId_storeId: {
@@ -178,54 +183,139 @@ export async function POST(
         trialEnd: true,
         trialStart: true,
         createdAt: true,
+        stripeSubscriptionId: true,
       },
     });
 
-    // Creative check: If they have a subscription record (regardless of status), they can't get trial
-    // OR if trialEnd/trialStart was ever set, they already used their trial
-    const userHadTrialBefore = !!userSubscriptionRecord;
+    // Multi-layer trial detection:
+    // 1. Any existing subscription record = user has subscribed before
+    // 2. If trialEnd or trialStart is set = user already used their trial
+    // 3. If stripeSubscriptionId exists = there's an active/past Stripe subscription
+    const hadSubscriptionBefore = !!userSubscriptionRecord;
+    const hadTrialBefore = !!(userSubscriptionRecord?.trialEnd || userSubscriptionRecord?.trialStart);
+    const userHadTrialBefore = hadSubscriptionBefore || hadTrialBefore;
 
-    console.log("[SUBSCRIPTION_CHECKOUT_INFO] Checking user subscription history:", {
+    console.log("[SUBSCRIPTION_CHECKOUT_TRIAL_CHECK] Comprehensive trial eligibility check:", {
       userId,
       storeId,
-      hadSubscriptionBefore: !!userSubscriptionRecord,
-      lastStatus: userSubscriptionRecord?.status,
-      lastTrialEnd: userSubscriptionRecord?.trialEnd,
-      lastTrialStart: userSubscriptionRecord?.trialStart,
+      email,
+      hadSubscriptionBefore,
+      hadTrialBefore,
       userHadTrialBefore,
+      existingRecord: userSubscriptionRecord ? {
+        id: userSubscriptionRecord.id,
+        status: userSubscriptionRecord.status,
+        trialEnd: userSubscriptionRecord.trialEnd,
+        trialStart: userSubscriptionRecord.trialStart,
+        stripeSubscriptionId: userSubscriptionRecord.stripeSubscriptionId,
+        createdAt: userSubscriptionRecord.createdAt,
+      } : null,
     });
 
     const frontendUrl = process.env.FRONTEND_STORE_URL || "http://localhost:3000";
 
-    // If user has EVER had a subscription (even if canceled/ended), no trial
-    const trialDays = userHadTrialBefore ? undefined : 7;
-
-    console.log("[SUBSCRIPTION_CHECKOUT_INFO] User had subscription/trial before:", userHadTrialBefore);
-    console.log("[SUBSCRIPTION_CHECKOUT_INFO] Trial days:", trialDays);
+    // Determine trial eligibility: ONLY first-time users get trials
+    const TRIAL_DAYS = 7;
+    const isEligibleForTrial = !userHadTrialBefore;
+    const trialDays = isEligibleForTrial ? TRIAL_DAYS : undefined;
 
     if (userHadTrialBefore) {
-      console.log("[SUBSCRIPTION_CHECKOUT_INFO] ❌ NO TRIAL - User previously had subscription with status:", userSubscriptionRecord?.status);
-      console.log("[SUBSCRIPTION_CHECKOUT_INFO] Previous trial ended:", userSubscriptionRecord?.trialEnd);
+      console.log("[SUBSCRIPTION_CHECKOUT_TRIAL_CHECK] ❌ NO TRIAL - User ineligible:", {
+        reason: hadTrialBefore ? "Previously used trial" : "Had subscription before",
+        previousStatus: userSubscriptionRecord?.status,
+        previousTrialEnd: userSubscriptionRecord?.trialEnd,
+        previousStripeId: userSubscriptionRecord?.stripeSubscriptionId,
+      });
     } else {
-      console.log("[SUBSCRIPTION_CHECKOUT_INFO] ✅ FIRST TIME USER - Will get 7-day free trial");
+      console.log("[SUBSCRIPTION_CHECKOUT_TRIAL_CHECK] ✅ TRIAL ELIGIBLE - First-time user:", {
+        trialDays: TRIAL_DAYS,
+        willCharge: "after trial ends",
+      });
     }
 
-    // Build subscription_data - only include trial_period_days if user never had a subscription
+    // Build subscription_data with metadata for webhook verification
     const subscriptionData: Stripe.Checkout.SessionCreateParams.SubscriptionData = {
       metadata: {
         userId,
         storeId,
         email,
         hadTrialBefore: userHadTrialBefore.toString(),
+        isEligibleForTrial: isEligibleForTrial.toString(),
+        checkoutTimestamp: new Date().toISOString(),
       },
     };
 
-    // ONLY add trial_period_days if user never had a subscription before
-    if (trialDays && !userHadTrialBefore) {
+    if (isEligibleForTrial && trialDays) {
       subscriptionData.trial_period_days = trialDays;
-      console.log("[SUBSCRIPTION_CHECKOUT_INFO] ✅ Adding trial period:", trialDays, "days");
+      console.log("[SUBSCRIPTION_CHECKOUT_TRIAL_CHECK] ✅ Adding trial_period_days to Stripe session:", trialDays);
     } else {
-      console.log("[SUBSCRIPTION_CHECKOUT_INFO] ❌ NO TRIAL - User had subscription before, charging immediately");
+      console.log("[SUBSCRIPTION_CHECKOUT_TRIAL_CHECK] NO trial_period_days - Immediate billing");
+    }
+
+    const now = Date.now();
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    const timestampWindow = Math.floor(now / FIVE_MINUTES);
+    const idempotencyKey = `checkout_${userId}_${storeId}_${priceId}_${timestampWindow}`;
+
+    console.log("[SUBSCRIPTION_CHECKOUT_IDEMPOTENCY] Generated idempotency key:", {
+      key: idempotencyKey,
+      userId,
+      storeId,
+      priceId,
+      timestampWindow,
+      windowStart: new Date(timestampWindow * FIVE_MINUTES).toISOString(),
+      windowEnd: new Date((timestampWindow + 1) * FIVE_MINUTES).toISOString(),
+    });
+
+    // Check for recent checkout session in the same window
+    // This provides additional protection before even calling Stripe
+    const recentCheckoutCutoff = new Date(Date.now() - FIVE_MINUTES);
+    const recentSession = await prismadb.checkoutSession.findFirst({
+      where: {
+        userId,
+        storeId,
+        priceId,
+        createdAt: {
+          gte: recentCheckoutCutoff,
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        stripeSessionId: true,
+        stripeSessionUrl: true,
+        createdAt: true,
+        expiresAt: true,
+      },
+    });
+
+    if (recentSession) {
+      const isExpired = recentSession.expiresAt && new Date(recentSession.expiresAt) < new Date();
+      
+      if (!isExpired && recentSession.stripeSessionUrl) {
+        console.log("[SUBSCRIPTION_CHECKOUT_IDEMPOTENCY] ♻️ Reusing existing checkout session:", {
+          sessionId: recentSession.stripeSessionId,
+          createdAt: recentSession.createdAt,
+          expiresAt: recentSession.expiresAt,
+          reason: "Recent valid session found (prevents duplicate)",
+        });
+
+        return NextResponse.json(
+          { 
+            url: recentSession.stripeSessionUrl,
+            reused: true,
+            sessionId: recentSession.stripeSessionId,
+          },
+          { headers: corsHeaders }
+        );
+      } else if (isExpired) {
+        console.log("[SUBSCRIPTION_CHECKOUT_IDEMPOTENCY] Previous session expired, creating new one:", {
+          expiredSessionId: recentSession.stripeSessionId,
+          expiredAt: recentSession.expiresAt,
+        });
+      }
     }
 
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
@@ -245,6 +335,8 @@ export async function POST(
         storeId,
         email,
         priceId,
+        idempotencyKey,
+        checkoutTimestamp: new Date().toISOString(),
       },
       allow_promotion_codes: true,
       billing_address_collection: "required",
@@ -253,10 +345,50 @@ export async function POST(
       },
     };
 
-    const session = await stripe.checkout.sessions.create(sessionConfig);
+    const session = await stripe.checkout.sessions.create(
+      sessionConfig,
+      {
+        idempotencyKey,
+      }
+    );
+
+    console.log("[SUBSCRIPTION_CHECKOUT_IDEMPOTENCY] ✅ Created new Stripe checkout session:", {
+      sessionId: session.id,
+      url: session.url,
+      expiresAt: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : null,
+      idempotencyKey,
+    });
+
+    try {
+      await prismadb.checkoutSession.create({
+        data: {
+          id: crypto.randomUUID(),
+          userId,
+          storeId,
+          priceId,
+          stripeSessionId: session.id,
+          stripeSessionUrl: session.url || "",
+          idempotencyKey,
+          expiresAt: session.expires_at ? new Date(session.expires_at * 1000) : null,
+          metadata: {
+            email,
+            hadTrialBefore: userHadTrialBefore,
+            isEligibleForTrial: isEligibleForTrial,
+          },
+        },
+      });
+
+      console.log("[SUBSCRIPTION_CHECKOUT_IDEMPOTENCY] 💾 Saved session to database for deduplication");
+    } catch (dbError) {
+      console.error("[SUBSCRIPTION_CHECKOUT_ERROR] Failed to save session to database:", dbError);
+      console.warn("[SUBSCRIPTION_CHECKOUT_WARNING] Session created in Stripe but not saved locally - idempotency may be affected");
+    }
 
     return NextResponse.json(
-      { url: session.url },
+      { 
+        url: session.url,
+        sessionId: session.id,
+      },
       { headers: corsHeaders }
     );
   } catch (error) {

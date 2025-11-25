@@ -182,6 +182,7 @@ export async function POST(
         price: new Prisma.Decimal(totalPrice),
         OrderItem: {
           create: productIds.map((productId: string) => ({
+            id: crypto.randomUUID(), // Add missing ID for OrderItem
             products: { connect: { id: productId } },
           })),
         },

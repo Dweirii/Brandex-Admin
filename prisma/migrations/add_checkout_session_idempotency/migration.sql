@@ -33,3 +33,5 @@ CREATE INDEX "CheckoutSession_idempotencyKey_idx" ON "CheckoutSession"("idempote
 CREATE INDEX "CheckoutSession_stripeSessionId_idx" ON "CheckoutSession"("stripeSessionId");
 
 
+
+

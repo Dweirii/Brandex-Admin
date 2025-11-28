@@ -44,14 +44,29 @@ export async function PATCH(
     const { userId } = await auth();
     const body = await req.json();
 
-    const { price } = body;
+    const {
+      name,
+      price,
+      categoryId,
+      Image,
+      isFeatured,
+      isArchived,
+      description,
+      downloadUrl,
+      videoUrl,
+      keywords,
+    } = body;
 
     // Basic validation
     if (!userId) return new NextResponse("Unauthenticated", { status: 401 });
     if (!storeId) return new NextResponse("Store ID is required", { status: 400 });
     if (!productId) return new NextResponse("Product ID is required", { status: 400 });
+
+    if (!name) return new NextResponse("Name is required", { status: 400 });
+    if (!Image || !Image.length) return new NextResponse("Image URL is required", { status: 400 });
     if (price === undefined || price === null) return new NextResponse("Price is required", { status: 400 });
     if (typeof price !== "number" || price < 0) return new NextResponse("Price must be a non-negative number", { status: 400 });
+    if (!categoryId) return new NextResponse("Category is required", { status: 400 });
 
     // Check if user owns the store
     const storeByUserId = await prismadb.store.findFirst({
@@ -78,12 +93,39 @@ export async function PATCH(
     }
 
     // Update product
+    await prismadb.products.update({
+      where: {
+        id: productId,
+      },
+      data: {
+        name: name.trim(),
+        price,
+        categoryId,
+        Image: {
+          deleteMany: {},
+        },
+        isFeatured,
+        isArchived,
+        description,
+        downloadUrl,
+        videoUrl,
+        keywords,
+        updatedAt: new Date(),
+      },
+    });
+
     const product = await prismadb.products.update({
       where: {
         id: productId,
       },
       data: {
-        price,
+        Image: {
+          createMany: {
+            data: [
+              ...Image.map((image: { url: string }) => image),
+            ],
+          },
+        },
       },
     });
 

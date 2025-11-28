@@ -122,7 +122,11 @@ export async function PATCH(
         Image: {
           createMany: {
             data: [
-              ...Image.map((image: { url: string }) => image),
+              ...Image.map((image: { url: string }) => ({
+                id: crypto.randomUUID(),
+                url: image.url,
+                updatedAt: new Date(),
+              })),
             ],
           },
         },

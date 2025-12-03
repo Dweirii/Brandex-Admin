@@ -7,6 +7,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
   const { storeId } = await params;
   const { searchParams } = new URL(req.url);
   const query = searchParams.get("query");
+  const categoryId = searchParams.get("categoryId");
   const limit = parseInt(searchParams.get("limit") || "10", 10);
 
   if (!query || !storeId || query.trim().length < 1) {
@@ -35,6 +36,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
         // Keywords that start with query
         { keywords: { hasSome: [normalizedQuery] } },
       ],
+      // Add category filter if categoryId is provided
+      ...(categoryId && { categoryId }),
     };
 
     // Fetch products matching the prefix

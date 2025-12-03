@@ -7,6 +7,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
   const { storeId } = await params;
   const { searchParams } = new URL(req.url);
   const query = searchParams.get("query");
+  const categoryId = searchParams.get("categoryId");
 
   const page = parseInt(searchParams.get("page") || "1", 10);
   const limit = parseInt(searchParams.get("limit") || "48", 10);
@@ -78,6 +79,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ stor
       storeId,
       isArchived: false,
       OR: searchConditions,
+      // Add category filter if categoryId is provided
+      ...(categoryId && { categoryId }),
     };
 
     // Fetch products and total count

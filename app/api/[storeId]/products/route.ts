@@ -131,7 +131,6 @@ export async function GET(
     const { searchParams } = new URL(req.url);
 
     const categoryId = searchParams.get("categoryId") || undefined;
-    const isFeatured = searchParams.get("isFeatured");
     const page = parseInt(searchParams.get("page") || "1", 10);
     // Align API default page size with storefront (24 items)
     const limit = parseInt(searchParams.get("limit") || "24", 10);

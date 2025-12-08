@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import prismadb from "@/lib/prismadb";
 import { Prisma } from "@prisma/client";
 
-// Dynamic CORS headers based on origin
+
 const getCorsHeaders = (origin: string | null) => {
   const allowedOrigins = [
     "https://brandexme.com",
@@ -61,6 +61,7 @@ export async function POST(
     if (!name) return new NextResponse("Name is required", { status: 400, headers: corsHeaders });
     if (!Image || !Image.length)
       return new NextResponse("Image URL is required", { status: 400, headers: corsHeaders });
+
     if (!price) return new NextResponse("Price is required", { status: 400, headers: corsHeaders });
     if (!categoryId) return new NextResponse("Category is required", { status: 400, headers: corsHeaders });
     if (!storeId) return new NextResponse("Store ID is required", { status: 400, headers: corsHeaders });
@@ -116,6 +117,7 @@ export async function POST(
     return new NextResponse("Internal server error", { status: 500, headers: corsHeaders });
   }
 }
+
 // GET: Retrieve products with pagination
 export async function GET(
   req: Request,
@@ -131,7 +133,8 @@ export async function GET(
     const categoryId = searchParams.get("categoryId") || undefined;
     const isFeatured = searchParams.get("isFeatured");
     const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "48", 10);
+    // Align API default page size with storefront (24 items)
+    const limit = parseInt(searchParams.get("limit") || "24", 10);
 
     const priceFilter = searchParams.get("priceFilter") || undefined;
 
@@ -168,14 +171,19 @@ export async function GET(
     const whereClause: Prisma.productsWhereInput = {
       storeId,
       isArchived: false,
+      // only include products that have media the UI can render
+      AND: [
+        {
+          OR: [
+            { Image: { some: { url: { not: "" } } } },
+            { videoUrl: { not: null } },
+          ],
+        },
+      ],
     };
 
     if (categoryId) {
       whereClause.categoryId = categoryId;
-    }
-
-    if (isFeatured) {
-      whereClause.isFeatured = true;
     }
 
     if (priceFilter === "free") {

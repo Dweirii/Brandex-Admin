@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prismadb from "@/lib/prismadb";
 import { Prisma } from "@prisma/client";
+import { syncProductToTypesense } from "@/lib/sync-product-to-typesense";
 
 
 const getCorsHeaders = (origin: string | null) => {
@@ -109,7 +110,13 @@ export async function POST(
         },
         updatedAt: new Date(),
       },
+      include: {
+        Category: true,
+      },
     });
+
+    // Sync to Typesense (non-blocking)
+    syncProductToTypesense(product.id).catch(console.error);
 
     return NextResponse.json(product, { headers: corsHeaders });
   } catch (error) {

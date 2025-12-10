@@ -177,13 +177,21 @@ export async function GET(
     const categoryName = product.Category?.name || "Product";
     const fileName = buildDownloadFilename(product.downloadUrl, `Brandex-${categoryName}`);
 
+    // Get content length if available
+    const contentLength = fileResponse.headers.get("content-length");
+    const responseHeaders: Record<string, string> = {
+      ...corsHeaders,
+      "Content-Type": "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${fileName}"`,
+    };
+
+    if (contentLength) {
+      responseHeaders["Content-Length"] = contentLength;
+    }
+
     return new NextResponse(fileResponse.body, {
       status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="${fileName}"`,
-      },
+      headers: responseHeaders,
     });
   } catch (error) {
     console.error("[DownloadHandler] Error:", error);

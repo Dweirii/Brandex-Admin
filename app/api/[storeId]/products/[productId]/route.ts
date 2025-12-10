@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prismadb from "@/lib/prismadb";
 import { serializeProduct } from "@/lib/serialize-product";
+import { syncProductToTypesense, deleteProductFromTypesense } from "@/lib/sync-product-to-typesense";
 
 // GET a single product
 export async function GET(
@@ -131,7 +132,13 @@ export async function PATCH(
           },
         },
       },
+      include: {
+        Category: true,
+      },
     });
+
+    // Sync to Typesense (non-blocking)
+    syncProductToTypesense(productId).catch(console.error);
 
     return NextResponse.json(product);
   } catch (error) {
@@ -183,6 +190,9 @@ export async function DELETE(
         id: productId,
       },
     });
+
+    // Delete from Typesense (non-blocking)
+    deleteProductFromTypesense(productId).catch(console.error);
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {

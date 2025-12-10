@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prismadb from "@/lib/prismadb";
 import { verifyCustomerToken } from "@/lib/verify-customer-token";
 import { checkSubscriptionAccess } from "@/lib/subscription";
+import { buildDownloadFilename } from "@/lib/utils";
 
 const getCorsHeaders = (origin: string | null) => {
   const allowedOrigins = [
@@ -10,13 +11,14 @@ const getCorsHeaders = (origin: string | null) => {
     "http://localhost:3000",
     "http://localhost:3001",
   ];
-  
+
   const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : "*";
-  
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Expose-Headers": "Content-Disposition",
     "Access-Control-Allow-Credentials": allowOrigin !== "*" ? "true" : "false",
     "Access-Control-Max-Age": "86400",
   };
@@ -36,7 +38,7 @@ export async function GET(
 ): Promise<Response> {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   try {
     const { storeId, productId } = await context.params;
 
@@ -62,7 +64,7 @@ export async function GET(
       }
 
       const token = authHeader.replace("Bearer ", "");
-      
+
       try {
         userId = await verifyCustomerToken(token);
       } catch (tokenError) {
@@ -115,13 +117,14 @@ export async function GET(
       });
     }
 
-    const fileName = product.downloadUrl.split("/").pop() ?? "file";
+    // Extract extension from CDN URL and build proper filename
+    const fileName = buildDownloadFilename(product.downloadUrl, product.name);
 
     return new NextResponse(fileResponse.body, {
       status: 200,
       headers: {
         ...corsHeaders,
-        "Content-Type": fileResponse.headers.get("Content-Type") || "application/octet-stream",
+        "Content-Type": "application/octet-stream",
         "Content-Disposition": `attachment; filename="${fileName}"`,
       },
     });

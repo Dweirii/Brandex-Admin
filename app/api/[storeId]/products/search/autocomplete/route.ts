@@ -40,7 +40,7 @@ export async function GET(
     // Extract unique suggestions from product names
     const suggestionsSet = new Set<string>();
     searchResults.hits?.forEach(hit => {
-      const doc = hit.document as any;
+      const doc = hit.document as { name: string };
       suggestionsSet.add(doc.name);
     });
 

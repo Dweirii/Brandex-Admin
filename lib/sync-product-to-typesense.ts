@@ -13,7 +13,7 @@ export async function syncProductToTypesense(productId: string) {
         .collections(PRODUCT_COLLECTION_NAME)
         .documents(productId)
         .delete()
-        .catch(err => console.log('Product not in Typesense:', productId));
+        .catch(() => console.log('Product not in Typesense:', productId));
       return;
     }
 

@@ -83,7 +83,9 @@ async function syncProductsToTypesense() {
     const collection = await typesenseAdmin.collections(PRODUCT_COLLECTION_NAME).retrieve();
     console.log(`\n📊 Collection stats:`);
     console.log(`   Documents: ${collection.num_documents}`);
-    console.log(`   Memory used: ${(collection.num_memory_bytes / 1024 / 1024).toFixed(2)} MB`);
+    if ('num_memory_bytes' in collection && typeof collection.num_memory_bytes === 'number') {
+      console.log(`   Memory used: ${(collection.num_memory_bytes / 1024 / 1024).toFixed(2)} MB`);
+    }
 
   } catch (error) {
     console.error('❌ Sync failed:', error);
@@ -97,4 +99,5 @@ async function syncProductsToTypesense() {
 }
 
 syncProductsToTypesense();
+
 

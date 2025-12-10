@@ -1,5 +1,6 @@
 import "dotenv/config";
 import Typesense from 'typesense';
+import { Prisma } from '@prisma/client';
 
 export const typesenseAdmin = new Typesense.Client({
   nodes: [{
@@ -30,21 +31,21 @@ export const PRODUCT_COLLECTION_NAME = 'products';
 export const productSchema = {
   name: PRODUCT_COLLECTION_NAME,
   fields: [
-    { name: 'id', type: 'string' },
-    { name: 'storeId', type: 'string', facet: true },
-    { name: 'name', type: 'string', sort: true },
-    { name: 'description', type: 'string', optional: true },
-    { name: 'keywords', type: 'string[]', optional: true, facet: true },
-    { name: 'categoryId', type: 'string', facet: true },
-    { name: 'categoryName', type: 'string', facet: true, optional: true },
-    { name: 'price', type: 'float', optional: true },
-    { name: 'downloadsCount', type: 'int32' },
-    { name: 'isArchived', type: 'bool', facet: true },
-    { name: 'isFeatured', type: 'bool', facet: true },
-    { name: 'createdAt', type: 'int64' },
+    { name: 'id', type: 'string' as const },
+    { name: 'storeId', type: 'string' as const, facet: true },
+    { name: 'name', type: 'string' as const, sort: true },
+    { name: 'description', type: 'string' as const, optional: true },
+    { name: 'keywords', type: 'string[]' as const, optional: true, facet: true },
+    { name: 'categoryId', type: 'string' as const, facet: true },
+    { name: 'categoryName', type: 'string' as const, facet: true, optional: true },
+    { name: 'price', type: 'float' as const, optional: true },
+    { name: 'downloadsCount', type: 'int32' as const },
+    { name: 'isArchived', type: 'bool' as const, facet: true },
+    { name: 'isFeatured', type: 'bool' as const, facet: true },
+    { name: 'createdAt', type: 'int64' as const },
   ],
   default_sorting_field: 'downloadsCount'
-} as const;
+};
 
 export type ProductDocument = {
   id: string;
@@ -61,7 +62,11 @@ export type ProductDocument = {
   createdAt: number;
 };
 
-export function toTypesenseDocument(product: any): ProductDocument {
+type ProductWithCategory = Prisma.productsGetPayload<{
+  include: { Category: true };
+}>;
+
+export function toTypesenseDocument(product: ProductWithCategory): ProductDocument {
   return {
     id: product.id,
     storeId: product.storeId,

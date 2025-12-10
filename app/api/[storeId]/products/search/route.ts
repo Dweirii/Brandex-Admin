@@ -53,7 +53,7 @@ export async function GET(
     const pageCount = Math.ceil(total / limit);
 
     // Get product IDs from search results
-    const productIds = searchResults.hits?.map(hit => (hit.document as any).id) || [];
+    const productIds = searchResults.hits?.map(hit => (hit.document as { id: string }).id) || [];
     
     if (productIds.length === 0) {
       return NextResponse.json(

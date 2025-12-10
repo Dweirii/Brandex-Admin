@@ -3,7 +3,10 @@
 import type { ColumnDef } from "@tanstack/react-table"
 import { useState, useEffect } from "react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Badge } from "@/components/ui/badge"
+import { CheckCircle2, XCircle } from "lucide-react"
 import { useSidebarState } from "@/hooks/use-sidebar"
+import { format } from "date-fns"
 
 export type OrderColumn = {
   id: string
@@ -13,8 +16,8 @@ export type OrderColumn = {
   totalPrice: string
   products: string
   createdAt: string
+  email?: string
 }
-
 
 // Cell component with truncation and tooltip for overflow text
 const TruncatedCell = ({ value }: { value: string }) => {
@@ -62,6 +65,7 @@ export const useColumns = () => {
           phone: false,
           address: false,
           createdAt: false,
+          email: false,
         }
       } else if (isTablet) {
         return {
@@ -71,6 +75,7 @@ export const useColumns = () => {
           phone: true,
           address: false,
           createdAt: true,
+          email: false,
         }
       }
     }
@@ -83,6 +88,7 @@ export const useColumns = () => {
       phone: true,
       address: isDesktop || (isTablet && !isOpen),
       createdAt: true,
+      email: isDesktop,
     }
   }
 
@@ -96,12 +102,67 @@ export const useColumns = () => {
     },
     {
       accessorKey: "isPaid",
-      header: "Paid",
-
+      header: "Status",
+      cell: ({ row }) => {
+        const isPaid = row.original.isPaid
+        return (
+          <Badge
+            variant={isPaid ? "default" : "destructive"}
+            className={isPaid ? "bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20" : ""}
+          >
+            {isPaid ? (
+              <>
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Paid
+              </>
+            ) : (
+              <>
+                <XCircle className="h-3 w-3 mr-1" />
+                Unpaid
+              </>
+            )}
+          </Badge>
+        )
+      },
     },
     {
       accessorKey: "totalPrice",
       header: "Total Price",
+      cell: ({ row }) => {
+        return <span className="font-medium">{row.original.totalPrice}</span>
+      },
+    },
+    {
+      accessorKey: "email",
+      header: "Email",
+      cell: ({ row }) => <TruncatedCell value={row.original.email || "-"} />,
+    },
+    {
+      accessorKey: "phone",
+      header: "Phone",
+      cell: ({ row }) => <TruncatedCell value={row.original.phone} />,
+    },
+    {
+      accessorKey: "address",
+      header: "Address",
+      cell: ({ row }) => <TruncatedCell value={row.original.address} />,
+    },
+    {
+      accessorKey: "createdAt",
+      header: "Date",
+      cell: ({ row }) => {
+        try {
+          const date = new Date(row.original.createdAt)
+          return (
+            <div className="flex flex-col">
+              <span className="text-sm">{format(date, "MMM d, yyyy")}</span>
+              <span className="text-xs text-muted-foreground">{format(date, "h:mm a")}</span>
+            </div>
+          )
+        } catch {
+          return <span>{row.original.createdAt}</span>
+        }
+      },
     },
   ]
 

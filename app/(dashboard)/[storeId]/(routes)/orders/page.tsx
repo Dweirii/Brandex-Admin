@@ -1,6 +1,5 @@
 import { OrderClient } from "./_components/client"
 import prismadb from "@/lib/prismadb"
-import { format } from "date-fns"
 import type { OrderColumn } from "./_components/columns"
 import { formatter } from "@/lib/utils"
 import { CheckCircle2, ClipboardListIcon, ShoppingCartIcon, XCircle } from "lucide-react"
@@ -32,15 +31,15 @@ const OrdersPage = async ({ params }: PageProps) => {
   })
 
   const formattedOrders: OrderColumn[] = orders.map((item) => {
-
     return {
       id: item.id,
       phone: item.phone || "-",
       address: item.address ?? "-",
+      email: item.email || "-",
       isPaid: item.isPaid,
       products: item.OrderItem.map((orderItem) => orderItem.products.name).join(", "),
       totalPrice: item.price ? formatter.format(item.price.toNumber()) : "N/A",
-      createdAt: format(item.createdAt, "MMMM do, yyyy"),
+      createdAt: item.createdAt.toISOString(),
     }
   })
 

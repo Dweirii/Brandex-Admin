@@ -44,6 +44,9 @@ export async function GET(
 
     const product = await prismadb.products.findFirst({
       where: { id: productId, storeId },
+      include: {
+        Category: true,
+      },
     });
 
     if (!product?.downloadUrl) {
@@ -90,8 +93,68 @@ export async function GET(
       }
     }
 
-    const fileResponse = await fetch(product.downloadUrl);
+    // Add timeout and proper headers for CDN fetch
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    
+    let fileResponse: Response;
+    
+    try {
+      fileResponse = await fetch(product.downloadUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Brandex/1.0)',
+        },
+        redirect: 'follow',
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!fileResponse.ok || !fileResponse.body) {
+        console.error('[DOWNLOAD_ERROR] CDN fetch failed:', {
+          status: fileResponse.status,
+          statusText: fileResponse.statusText,
+          url: product.downloadUrl,
+          productId,
+          productName: product.name,
+        });
+        
+        // Return specific error message for CDN issues
+        if (fileResponse.status === 404) {
+          return new NextResponse("CDN_ERROR: The file is temporarily unavailable due to a global CDN issue. This is not from our system. Please try again in a few moments.", {
+            status: 503,
+            headers: corsHeaders,
+          });
+        }
+        
+        return new NextResponse(`CDN_ERROR: Failed to fetch file from storage provider (Status: ${fileResponse.status})`, {
+          status: 503,
+          headers: corsHeaders,
+        });
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.error('[DOWNLOAD_ERROR] CDN fetch exception:', {
+        error: fetchError,
+        url: product.downloadUrl,
+        productId,
+        productName: product.name,
+      });
+      
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return new NextResponse("CDN_ERROR: The download is taking longer than expected due to a temporary service issue. Please try again in a moment.", {
+          status: 503,
+          headers: corsHeaders,
+        });
+      }
+      
+      return new NextResponse("CDN_ERROR: Unable to retrieve file from storage provider. This is a temporary issue. Please try again shortly.", {
+        status: 503,
+        headers: corsHeaders,
+      });
+    }
 
+    // Track download AFTER successful fetch
     await prismadb.products.update({
       where: { id: productId },
       data: {
@@ -110,15 +173,9 @@ export async function GET(
       },
     });
 
-    if (!fileResponse.ok || !fileResponse.body) {
-      return new NextResponse("Failed to fetch file", {
-        status: 500,
-        headers: corsHeaders,
-      });
-    }
-
     // Extract extension from CDN URL and build proper filename
-    const fileName = buildDownloadFilename(product.downloadUrl, product.name);
+    const categoryName = product.Category?.name || "Product";
+    const fileName = buildDownloadFilename(product.downloadUrl, `Brandex-${categoryName}`);
 
     return new NextResponse(fileResponse.body, {
       status: 200,

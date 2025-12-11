@@ -17,7 +17,8 @@ const getCorsHeaders = (origin: string | null) => {
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    // include x-user-id so free downloads can attach to users
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-user-id",
     "Access-Control-Expose-Headers": "Content-Disposition",
     "Access-Control-Allow-Credentials": allowOrigin !== "*" ? "true" : "false",
     "Access-Control-Max-Age": "86400",
@@ -38,6 +39,8 @@ export async function GET(
 ): Promise<Response> {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
+  const headerUserId = req.headers.get("x-user-id");
+  const authHeader = req.headers.get("authorization");
 
   try {
     const { storeId, productId } = await context.params;
@@ -61,7 +64,6 @@ export async function GET(
     let userId: string | null = null;
 
     if (!isFreeProduct) {
-      const authHeader = req.headers.get("authorization");
       if (!authHeader?.startsWith("Bearer ")) {
         return new NextResponse("Unauthorized", { status: 401, headers: corsHeaders });
       }
@@ -90,6 +92,20 @@ export async function GET(
           status: 403,
           headers: corsHeaders,
         });
+      }
+    } else {
+      // For free products, try to associate the download with a user when available
+      if (authHeader?.startsWith("Bearer ")) {
+        const token = authHeader.replace("Bearer ", "");
+        try {
+          userId = await verifyCustomerToken(token);
+        } catch (tokenError) {
+          console.warn("[DOWNLOAD_FREE] Optional token verification failed, continuing as guest", tokenError);
+        }
+      }
+
+      if (!userId && headerUserId) {
+        userId = headerUserId;
       }
     }
 

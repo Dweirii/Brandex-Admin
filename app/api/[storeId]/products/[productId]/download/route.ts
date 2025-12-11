@@ -17,7 +17,6 @@ const getCorsHeaders = (origin: string | null) => {
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    // include x-user-id so free downloads can attach to users
     "Access-Control-Allow-Headers": "Content-Type, Authorization, x-user-id",
     "Access-Control-Expose-Headers": "Content-Disposition",
     "Access-Control-Allow-Credentials": allowOrigin !== "*" ? "true" : "false",
@@ -94,7 +93,6 @@ export async function GET(
         });
       }
     } else {
-      // For free products, try to associate the download with a user when available
       if (authHeader?.startsWith("Bearer ")) {
         const token = authHeader.replace("Bearer ", "");
         try {
@@ -109,9 +107,8 @@ export async function GET(
       }
     }
 
-    // Add timeout and proper headers for CDN fetch
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
     
     let fileResponse: Response;
     
@@ -135,7 +132,6 @@ export async function GET(
           productName: product.name,
         });
         
-        // Return specific error message for CDN issues
         if (fileResponse.status === 404) {
           return new NextResponse("CDN_ERROR: The file is temporarily unavailable due to a global CDN issue. This is not from our system. Please try again in a few moments.", {
             status: 503,
@@ -170,7 +166,6 @@ export async function GET(
       });
     }
 
-    // Track download AFTER successful fetch
     await prismadb.products.update({
       where: { id: productId },
       data: {
@@ -189,11 +184,9 @@ export async function GET(
       },
     });
 
-    // Extract extension from CDN URL and build proper filename
     const categoryName = product.Category?.name || "Product";
     const fileName = buildDownloadFilename(product.downloadUrl, `Brandex-${categoryName}`);
 
-    // Get content length if available
     const contentLength = fileResponse.headers.get("content-length");
     const responseHeaders: Record<string, string> = {
       ...corsHeaders,

@@ -7,23 +7,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sto
     const { items } = body;
 
     if (!items || !Array.isArray(items)) {
+      console.error("❌ Invalid payload: items is not an array");
       return new NextResponse("Invalid payload", { status: 400 });
     }
 
     const storeId = (await params).storeId;
-    const CHUNK_SIZE = 100;
+    const totalChunks = Math.ceil(items.length / 100); // Chunk size is handled in Inngest function
 
-    for(let i = 0; i<items.length; i+= CHUNK_SIZE) {
-      const chunk = items.slice(i, i + CHUNK_SIZE);
+    console.log(`📦 Starting bulk import for store ${storeId}`);
+    console.log(`📊 Total items: ${items.length}, Will be processed in ${totalChunks} chunks of 100`);
 
-      await inngest.send({
-        name: "bulk.import",
-        data: {
-          storeId,
-          items: chunk,
-        },
-      });
-    }
+    // Send ALL items in ONE event - Inngest function will handle chunking internally
+    console.log(`📤 Sending ${items.length} items to Inngest (will be chunked internally)`);
+
+    await inngest.send({
+      name: "bulk.import",
+      data: {
+        storeId,
+        items: items, // Send all items, not chunks
+      },
+    });
+
+    console.log(`✅ All ${items.length} items sent to Inngest successfully`);
+    console.log(`⏳ Inngest is processing ${items.length} items in ${totalChunks} chunks of 100`);
 
     return NextResponse.json({
       success: true,
@@ -31,9 +37,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sto
       failed: 0,
       errors: [],
       failedRows: [],
+      message: `Import queued: ${items.length} products sent for processing`
     });
   } catch (error) {
-    console.error("Bulk import error:", error);
+    console.error("❌ Bulk import error:", error);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

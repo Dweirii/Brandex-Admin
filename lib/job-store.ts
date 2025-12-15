@@ -1,9 +1,19 @@
 // Shared job store for tracking Inngest job status
 // In production, use Redis or database for persistence
 
+interface GeneratedProduct {
+  name: string;
+  description: string;
+  price: string;
+  categoryId: string;
+  imageUrl: string;
+  downloadUrl: string;
+  keywords: string[];
+}
+
 interface JobStatus {
   status: "pending" | "processing" | "completed" | "failed";
-  products?: any[];
+  products?: GeneratedProduct[];
   processed?: number;
   failed?: number;
   total?: number;

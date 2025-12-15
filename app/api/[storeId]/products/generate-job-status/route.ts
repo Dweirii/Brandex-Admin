@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: Promise<{ storeId: string }> }
 ) {
   try {
-    const { storeId } = await params
+    await params // storeId available if needed for future use
     const { searchParams } = new URL(req.url)
     const jobId = searchParams.get("jobId")
 

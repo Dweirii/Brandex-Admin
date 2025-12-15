@@ -38,6 +38,8 @@ model Image {
   createdAt DateTime @default(now())
   updatedAt DateTime
   products  products @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
 }
 
 model Order {

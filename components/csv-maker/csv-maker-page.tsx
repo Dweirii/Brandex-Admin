@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "react-hot-toast"
-import { Wand2, Image as ImageIcon, Download, Upload, Loader2, Plus, X, FileText, Progress } from "lucide-react"
+import { Wand2, Image as ImageIcon, Download, Upload, Loader2, Plus, X } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
@@ -262,7 +261,7 @@ export default function CsvMakerPage({ storeId, categories, onImportSuccess }: C
           clearInterval(pollInterval)
           const finalStatus = jobStatus
           if (finalStatus !== "completed" && finalStatus !== "failed") {
-            toast.info("Job is still processing. Check back later or refresh the page.")
+            toast("Job is still processing. Check back later or refresh the page.")
           }
         }, 30 * 60 * 1000)
 
@@ -560,7 +559,7 @@ export default function CsvMakerPage({ storeId, categories, onImportSuccess }: C
               onChange={(e) => setPrice(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Enter a number (e.g., 29.99) or "free" for free products. Price will be applied to all generated products.
+              Enter a number (e.g., 29.99) or &quot;free&quot; for free products. Price will be applied to all generated products.
             </p>
           </div>
 
@@ -662,6 +661,7 @@ export default function CsvMakerPage({ storeId, categories, onImportSuccess }: C
                         <TableCell className="max-w-md truncate">{product.description}</TableCell>
                         <TableCell>${product.price}</TableCell>
                         <TableCell>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={product.imageUrl}
                             alt={product.name}

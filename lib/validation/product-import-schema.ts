@@ -5,18 +5,30 @@ export const productImportSchema = z.object({
     .string()
     .min(1, "Product name is required")
     .max(100, "Product name must be less than 100 characters")
-    .regex(/^[a-zA-Z0-9\s\-_.:,()&+/]+$/, "Product name contains invalid characters"),
+    // More permissive regex - allows Unicode, most special chars, but blocks control chars and null bytes
+    .refine((val) => {
+      // Block only truly dangerous characters: control chars, null bytes, and script injection attempts
+      return !/[\x00-\x08\x0B-\x0C\x0E-\x1F]/.test(val) && 
+             !val.includes('<script') && 
+             !val.includes('javascript:') &&
+             val.trim().length > 0;
+    }, "Product name contains invalid characters"),
 
   description: z.string().max(1000, "Description must be less than 1000 characters").optional().nullable(),
 
   price: z
     .string()
     .transform((val) => {
+      // Handle "free" as 0
+      const normalized = val.toLowerCase().trim()
+      if (normalized === "free" || normalized === "0" || normalized === "0.00") {
+        return 0
+      }
       const num = Number.parseFloat(val.replace(/[,$]/g, ""));
       return num;
     })
     .refine((val) => !isNaN(val) && val >= 0 && val <= 999999.99, {
-      message: "Price must be a number between 0 and 999,999.99",
+      message: "Price must be a number between 0 and 999,999.99, or 'free'",
     }),
 
   categoryId: z.string().uuid("Category ID must be a valid UUID format"),

@@ -93,15 +93,19 @@ export default function CsvImportPage({ storeId, onImportSuccess }: CsvImportPag
 
           setOriginalRows(results.data)
           const { validRows, errors } = validateProductBatch(results.data)
+          
           setRows(validRows)
           setValidationErrors(errors)
           setStatus("completed")
 
           if (errors.length > 0) {
             setShowErrorManagement(true)
-            toast.error(`Found ${errors.length} validation errors. Please review and fix them.`)
+            const rejectedCount = results.data.length - validRows.length;
+            toast.error(`Found ${errors.length} validation errors in ${rejectedCount} products. ${validRows.length} products passed validation. Please review and fix them.`, { duration: 6000 });
+            console.warn(`⚠️ VALIDATION SUMMARY: ${results.data.length} total rows → ${validRows.length} valid → ${rejectedCount} rejected`);
           } else {
             toast.success(`Successfully parsed ${validRows.length} rows.`)
+            console.log(`✅ VALIDATION SUMMARY: All ${validRows.length} products passed validation`);
           }
         } catch (error) {
           console.error("Validation error:", error)

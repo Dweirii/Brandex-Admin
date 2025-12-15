@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clerkClient } from "@clerk/nextjs/server";
+import { clerkClient, createClerkClient } from "@clerk/nextjs/server";
 import prismadb from "@/lib/prismadb";
 
 // Dynamic CORS headers based on origin
@@ -59,6 +59,7 @@ export async function GET(
     }
 
     // Get leaderboard data - group downloads by userId and count
+    // Also get the most recent email for each user as fallback
     const leaderboardData = await prismadb.downloads.groupBy({
       by: ["userId"],
       where: {
@@ -75,6 +76,32 @@ export async function GET(
       },
       skip,
       take: limit,
+    });
+
+    // Get email addresses for users as fallback (from most recent download)
+    const userIdsForEmail = leaderboardData.map(entry => entry.userId!);
+    const userEmails = await prismadb.downloads.findMany({
+      where: {
+        storeId,
+        userId: { in: userIdsForEmail },
+        email: { not: null },
+      },
+      select: {
+        userId: true,
+        email: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      distinct: ["userId"],
+    });
+
+    // Create email map
+    const emailMap = new Map<string, string>();
+    userEmails.forEach(download => {
+      if (download.userId && download.email && !emailMap.has(download.userId)) {
+        emailMap.set(download.userId, download.email);
+      }
     });
 
     // Get total count for pagination
@@ -100,9 +127,39 @@ export async function GET(
 
     if (userIds.length > 0) {
       try {
-        const client = await clerkClient();
+        // Use Store's Clerk secret key if available, otherwise fall back to Admin's
+        const storeClerkSecretKey = process.env.STORE_CLERK_SECRET_KEY || process.env.CLERK_SECRET_KEY;
+        const client = storeClerkSecretKey 
+          ? createClerkClient({ secretKey: storeClerkSecretKey })
+          : await clerkClient();
         
-        console.log(`[LEADERBOARD] Attempting to fetch ${userIds.length} users from Clerk`);
+        console.log(`[LEADERBOARD] Using ${storeClerkSecretKey === process.env.STORE_CLERK_SECRET_KEY ? 'Store' : 'Admin'} Clerk instance`);
+        
+        // Test Clerk connection with first user
+        let shouldFetchFromClerk = false;
+        try {
+          const testUser = await client.users.getUser(userIds[0]);
+          console.log(`[LEADERBOARD] Clerk connection test successful. Sample user:`, {
+            id: testUser.id,
+            username: testUser.username || 'none',
+            hasImage: !!testUser.imageUrl,
+            firstName: testUser.firstName || 'none',
+          });
+          shouldFetchFromClerk = true;
+        } catch (testErr: unknown) {
+          const error = testErr as { message?: string; status?: number; statusCode?: number };
+          console.warn(`[LEADERBOARD] Clerk connection test FAILED (will use fallback):`, {
+            error: error?.message || String(testErr),
+            status: error?.status || error?.statusCode,
+            userId: userIds[0],
+          });
+          console.log(`[LEADERBOARD] Skipping Clerk API calls, using fallback from database`);
+          shouldFetchFromClerk = false;
+        }
+        
+        // Only fetch from Clerk if test passed
+        if (shouldFetchFromClerk) {
+          console.log(`[LEADERBOARD] Attempting to fetch ${userIds.length} users from Clerk`);
         
         // Fetch users in batches to avoid rate limits
         const batchSize = 10;
@@ -124,8 +181,32 @@ export async function GET(
                 lastName: user.lastName || null,
               };
               
+              // Log successful fetch for first user in batch for debugging
+              if (batch.indexOf(userId) === 0) {
+                console.log(`[LEADERBOARD] Sample user data:`, {
+                  id: userData.id,
+                  hasUsername: !!userData.username,
+                  hasImage: !!userData.imageUrl,
+                  hasFirstName: !!userData.firstName,
+                });
+              }
+              
               return userData;
-            } catch {
+            } catch (err: unknown) {
+              // Log error for debugging
+              const error = err as { message?: string; status?: number; statusCode?: number; name?: string };
+              const errorMsg = error?.message || String(err);
+              const errorStatus = error?.status || error?.statusCode;
+              
+              // Log first error in batch to avoid spam
+              if (batch.indexOf(userId) === 0) {
+                console.error(`[LEADERBOARD] Error fetching user ${userId}:`, {
+                  error: errorMsg,
+                  status: errorStatus,
+                  name: error?.name,
+                });
+              }
+              
               return null;
             }
           });
@@ -154,39 +235,54 @@ export async function GET(
         const failedCount = userIds.length - fetchedCount;
         console.log(`[LEADERBOARD] Successfully fetched ${fetchedCount}/${userIds.length} users from Clerk (${failedCount} failed or not found)`);
         
-        if (fetchedCount === 0) {
-          console.error(`[LEADERBOARD] WARNING: No users were fetched from Clerk. This could indicate:`);
-          console.error(`  - Clerk API key is invalid or missing`);
-          console.error(`  - User IDs in database don't match Clerk user IDs`);
-          console.error(`  - All users have been deleted from Clerk`);
+          if (fetchedCount === 0) {
+            console.error(`[LEADERBOARD] WARNING: No users were fetched from Clerk. This could indicate:`);
+            console.error(`  - Clerk API key is invalid or missing`);
+            console.error(`  - User IDs in database don't match Clerk user IDs`);
+            console.error(`  - All users have been deleted from Clerk`);
+          }
         }
-      }
-      catch  {
-        console.error(`[LEADERBOARD] Failed to fetch user`);
+      } catch (clerkError: unknown) {
+        const error = clerkError as { message?: string; status?: number; statusCode?: number; name?: string };
+        console.error(`[LEADERBOARD] Fatal Clerk error:`, {
+          message: error?.message || String(clerkError),
+          status: error?.status || error?.statusCode,
+          name: error?.name,
+        });
+        // Continue without user data if Clerk fails
       }
     }
 
     // Format the response with user data
     const leaderboard = leaderboardData.map((entry, index) => {
       const userData = userMap.get(entry.userId!);
+      const fallbackEmail = emailMap.get(entry.userId!);
+      const emailUsername = fallbackEmail ? fallbackEmail.split('@')[0] : null;
       
-      // Create display name with priority: username > full name > first name > null
+      // Create display name with priority: 
+      // Clerk username > Clerk full name > Clerk first name > email username > null
       const displayName = userData?.username 
         || (userData?.firstName && userData?.lastName 
           ? `${userData.firstName} ${userData.lastName}`.trim()
-          : userData?.firstName || null);
+          : userData?.firstName || emailUsername || null);
 
       return {
         rank: skip + index + 1,
         userId: entry.userId!,
         totalDownloads: entry._count.id,
         user: userData ? {
-          username: userData.username,
+          username: userData.username || emailUsername,
           imageUrl: userData.imageUrl,
           firstName: userData.firstName,
           lastName: userData.lastName,
-          displayName: displayName || userData.username || userData.firstName || null,
-        } : null,
+          displayName: displayName || userData.username || emailUsername || null,
+        } : (fallbackEmail ? {
+          username: emailUsername,
+          imageUrl: null,
+          firstName: null,
+          lastName: null,
+          displayName: emailUsername,
+        } : null),
       };
     });
 

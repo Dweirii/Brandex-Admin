@@ -99,7 +99,7 @@ export async function POST(
     const failedUrls: string[] = []
 
     // Process each image URL with concurrency control
-    const processImage = async (imageUrl: string, index: number): Promise<{ success: boolean; url: string; error?: string }> => {
+    const processImage = async (imageUrl: string): Promise<{ success: boolean; url: string; error?: string }> => {
       try {
         // Call OpenAI Vision API
         const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -209,7 +209,7 @@ export async function POST(
     const CONCURRENT_LIMIT = 5
     for (let i = 0; i < imageUrls.length; i += CONCURRENT_LIMIT) {
       const batch = imageUrls.slice(i, i + CONCURRENT_LIMIT)
-      await Promise.all(batch.map((url, idx) => processImage(url, i + idx)))
+      await Promise.all(batch.map((url) => processImage(url)))
       
       // Small delay between batches to respect rate limits
       if (i + CONCURRENT_LIMIT < imageUrls.length) {

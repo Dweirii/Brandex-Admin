@@ -1,17 +1,6 @@
 import { inngest } from "@/app/inngest/inngest";
-import { hasJob, getJob, updateJob } from "@/lib/job-store";
+import { hasJob, updateJob } from "@/lib/job-store";
 import prismadb from "@/lib/prismadb";
-
-interface GenerateProductsEvent {
-  name: "products.generate-from-images";
-  data: {
-    storeId: string;
-    imageUrls: string[];
-    categoryId: string;
-    price: number;
-    jobId: string;
-  };
-}
 
 interface GeneratedProduct {
   name: string;
@@ -294,7 +283,6 @@ export const generateProductsFromImages = inngest.createFunction(
 
       // Update job status to completed
       if (hasJob(jobId)) {
-        const existing = getJob(jobId);
         updateJob(jobId, {
           status: "completed",
           products: accumulator.products,

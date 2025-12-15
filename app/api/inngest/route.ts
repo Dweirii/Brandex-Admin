@@ -3,6 +3,7 @@
 import { Inngest } from "inngest";
 import { serve } from "inngest/next";
 import { bulkImport } from "@/app/inngest/functions/bulkImport";
+import { generateProductsFromImages } from "@/app/inngest/functions/generateProductsFromImages";
 import {
   sendDailyReport,
   sendWeeklyReport,
@@ -15,6 +16,7 @@ export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
     bulkImport,
+    generateProductsFromImages,
     sendDailyReport,
     sendWeeklyReport,
     sendMonthlyReport,

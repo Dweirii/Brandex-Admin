@@ -10,7 +10,7 @@ export default async function ProductsPage({ params }: { params: RouteParams }) 
   const { storeId } = await params
 
   // Parallel queries for faster loading
-  const [products, categoriesRaw] = await Promise.all([
+  const [products, categoriesRaw, totalCount] = await Promise.all([
     prismadb.products.findMany({
       where: { storeId },
       include: {
@@ -18,11 +18,15 @@ export default async function ProductsPage({ params }: { params: RouteParams }) 
         Image: { select: { url: true }, orderBy: { createdAt: "asc" }, take: 1 }, // Only first image
       },
       orderBy: { createdAt: "desc" },
+      take: 5000, // Reasonable limit to prevent extreme load times
     }),
     prismadb.category.findMany({
       where: { storeId },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
+    }),
+    prismadb.products.count({
+      where: { storeId },
     }),
   ])
 
@@ -46,5 +50,5 @@ export default async function ProductsPage({ params }: { params: RouteParams }) 
   }))
 
   // categories are now plain objects (id, name)
-  return <ProductClient data={formattedProducts} categories={categoriesRaw} storeId={storeId} />
+  return <ProductClient data={formattedProducts} categories={categoriesRaw} storeId={storeId} totalCount={totalCount} />
 }

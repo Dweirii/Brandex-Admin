@@ -18,12 +18,14 @@ interface ProductClientProps {
     data: ProductColumn[]
     categories: { id: string; name: string }[]
     storeId: string;
+    totalCount: number;
 }
 
 export const ProductClient: React.FC<ProductClientProps> = ({
     data,
     categories,
-    storeId
+    storeId,
+    totalCount
 }) =>{
 
   const router = useRouter();
@@ -73,7 +75,11 @@ export const ProductClient: React.FC<ProductClientProps> = ({
                 <h2 className="text-lg font-medium">Products List</h2>
               </div>
               <div className="text-sm text-muted-foreground">
-                Total: {filteredData.length} {filteredData.length === 1 ? "Product" : "Products"}
+                {data.length < totalCount ? (
+                  <>Showing {data.length} of {totalCount} Products</>
+                ) : (
+                  <>Total: {filteredData.length} {filteredData.length === 1 ? "Product" : "Products"}</>
+                )}
               </div>
             </div>
   
@@ -83,7 +89,7 @@ export const ProductClient: React.FC<ProductClientProps> = ({
               <div className="p-4">
                 <div className="flex items-center justify-between pb-5">
                   <Heading
-                    title={`Products (${filteredData.length})`}
+                    title={`Products (${filteredData.length}${data.length < totalCount ? ` of ${totalCount}` : ''})`}
                     description="Manage Products for your store"
                   />
                   <div className="flex gap-2">

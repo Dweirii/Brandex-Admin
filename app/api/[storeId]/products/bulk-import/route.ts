@@ -12,24 +12,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sto
     }
 
     const storeId = (await params).storeId;
-    const totalChunks = Math.ceil(items.length / 100); // Chunk size is handled in Inngest function
+    const CHUNK_SIZE = 500; // Send chunks of 500 items per event to avoid state size limits
+    const totalChunks = Math.ceil(items.length / CHUNK_SIZE);
 
     console.log(`📦 Starting bulk import for store ${storeId}`);
-    console.log(`📊 Total items: ${items.length}, Will be processed in ${totalChunks} chunks of 100`);
+    console.log(`📊 Total items: ${items.length}, Will be sent in ${totalChunks} events of ${CHUNK_SIZE}`);
 
-    // Send ALL items in ONE event - Inngest function will handle chunking internally
-    console.log(`📤 Sending ${items.length} items to Inngest (will be chunked internally)`);
+    // Send items in chunks to avoid state size limits and improve performance
+    const events = [];
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      const chunk = items.slice(i, i + CHUNK_SIZE);
+      events.push({
+        name: "bulk.import" as const,
+        data: {
+          storeId,
+          items: chunk,
+        },
+      });
+    }
 
-    await inngest.send({
-      name: "bulk.import",
-      data: {
-        storeId,
-        items: items, // Send all items, not chunks
-      },
-    });
+    console.log(`📤 Sending ${items.length} items to Inngest in ${events.length} events`);
 
-    console.log(`✅ All ${items.length} items sent to Inngest successfully`);
-    console.log(`⏳ Inngest is processing ${items.length} items in ${totalChunks} chunks of 100`);
+    // Send all events in parallel for faster processing
+    await Promise.all(events.map(event => inngest.send(event)));
+
+    console.log(`✅ All ${items.length} items sent to Inngest successfully in ${events.length} events`);
 
     return NextResponse.json({
       success: true,
@@ -37,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ sto
       failed: 0,
       errors: [],
       failedRows: [],
-      message: `Import queued: ${items.length} products sent for processing`
+      message: `Import queued: ${items.length} products sent for processing in ${events.length} batches`
     });
   } catch (error) {
     console.error("❌ Bulk import error:", error);

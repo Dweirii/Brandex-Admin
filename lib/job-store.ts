@@ -38,7 +38,32 @@ export function hasJob(jobId: string): boolean {
 export function updateJob(jobId: string, updates: Partial<JobStatus>): void {
   const existing = jobStore.get(jobId);
   if (existing) {
-    jobStore.set(jobId, { ...existing, ...updates });
+    // Accumulate numeric values (processed, failed) instead of overwriting
+    const accumulatedUpdates: Partial<JobStatus> = { ...updates };
+    
+    // Accumulate processed count
+    if (updates.processed !== undefined) {
+      accumulatedUpdates.processed = (existing.processed || 0) + updates.processed;
+    }
+    
+    // Accumulate failed count
+    if (updates.failed !== undefined) {
+      accumulatedUpdates.failed = (existing.failed || 0) + updates.failed;
+    }
+    
+    // Merge products arrays (limit to first 100)
+    if (updates.products) {
+      const existingProducts = existing.products || [];
+      const mergedProducts = [...existingProducts, ...updates.products];
+      accumulatedUpdates.products = mergedProducts.slice(0, 100);
+    }
+    
+    // Update total if provided (should be the same across all events)
+    if (updates.total !== undefined) {
+      accumulatedUpdates.total = updates.total;
+    }
+    
+    jobStore.set(jobId, { ...existing, ...accumulatedUpdates });
   }
 }
 

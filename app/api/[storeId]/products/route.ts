@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import prismadb from "@/lib/prismadb";
 import { Prisma } from "@prisma/client";
 import { syncProductToTypesense } from "@/lib/sync-product-to-typesense";
+import { filterProductsWithValidMedia } from "@/lib/utils/check-image-url";
 
 
 const getCorsHeaders = (origin: string | null) => {
@@ -237,10 +238,13 @@ export async function GET(
       }),
     ]);
 
+    // Filter out products with all 404 images
+    const validProducts = await filterProductsWithValidMedia(products);
+
     const pageCount = Math.ceil(total / limit);
 
     return NextResponse.json({
-      products,
+      products: validProducts,
       total,
       page,
       pageCount,

@@ -1,5 +1,5 @@
 import { inngest } from "@/app/inngest/inngest";
-import { hasJob, updateJob } from "@/lib/job-store";
+import { hasJob, updateJob, getJob, setJob } from "@/lib/job-store";
 import prismadb from "@/lib/prismadb";
 
 interface GeneratedProduct {
@@ -17,16 +17,28 @@ export const generateProductsFromImages = inngest.createFunction(
   { event: "products.generate-from-images" },
   async ({ event, step }) => {
     const { imageUrls, categoryId, price, storeId, jobId } = event.data;
-    const BATCH_SIZE = 10; // Process 10 images per batch
-    const CONCURRENT_LIMIT = 5; // Process 5 images concurrently per batch
+    const BATCH_SIZE = 50; // Process 50 images per batch (increased from 10 for better performance)
+    const CONCURRENT_LIMIT = 10; // Process 10 images concurrently per batch (increased from 5)
 
     try {
       console.log(`🚀 [Inngest] Starting product generation for job ${jobId}`);
       console.log(`📊 [Inngest] Processing ${imageUrls.length} images in batches of ${BATCH_SIZE}`);
 
-      // Update job status to processing
+      // Update job status to processing (or create if doesn't exist due to process isolation)
       if (hasJob(jobId)) {
         updateJob(jobId, { status: "processing" });
+      } else {
+        // Job might not exist if Inngest is in a different process (common in production)
+        // Create it here to ensure it exists
+        console.log(`⚠️ [Inngest] Job ${jobId} not found in store, creating it`);
+        setJob(jobId, {
+          status: "processing",
+          total: imageUrls.length,
+          processed: 0,
+          failed: 0,
+          products: [],
+          createdAt: Date.now(),
+        });
       }
 
       const openaiApiKey = process.env.OPENAI_API_KEY;
@@ -35,6 +47,9 @@ export const generateProductsFromImages = inngest.createFunction(
       }
 
       // Initialize accumulator
+      // Limit stored data to prevent state size issues
+      const MAX_STORED_PRODUCTS = 100; // Only store first 100 products for job status
+      const MAX_FAILED_URLS = 100; // Only store first 100 failed URLs
       let accumulator = await step.run("initialize-accumulator", async () => {
         return {
           products: [] as GeneratedProduct[],
@@ -109,6 +124,15 @@ export const generateProductsFromImages = inngest.createFunction(
               return { success: false, url: imageUrl };
             }
 
+            // Check if OpenAI refused to process the image
+            const refusalPhrases = ["I'm sorry", "I'm unable", "I cannot", "I can't", "I apologize"];
+            const isRefusal = refusalPhrases.some(phrase => content.trim().startsWith(phrase));
+            
+            if (isRefusal) {
+              console.warn(`⚠️ OpenAI refused to process ${imageUrl}: ${content.substring(0, 100)}...`);
+              return { success: false, url: imageUrl };
+            }
+
             // Parse JSON response
             let productData: { name?: string; description?: string; keywords?: string };
             try {
@@ -119,7 +143,7 @@ export const generateProductsFromImages = inngest.createFunction(
                 productData = JSON.parse(content);
               }
             } catch (parseError) {
-              console.error(`Failed to parse OpenAI response for ${imageUrl}:`, parseError);
+              console.error(`Failed to parse OpenAI response for ${imageUrl}: ${content.substring(0, 100)}...`);
               // Fallback: create basic product from URL
               const urlParts = imageUrl.split("/").pop() || "Product";
               const baseName = urlParts.split(".")[0].replace(/[-_]/g, " ");
@@ -192,12 +216,15 @@ export const generateProductsFromImages = inngest.createFunction(
         });
 
         // Accumulate results
+        // Limit stored products and failed URLs to prevent state size issues
         accumulator = await step.run(`accumulate-batch-${batchIndex}`, async () => {
+          const newProducts = [...accumulator.products, ...batchResult.products];
+          const newFailedUrls = [...accumulator.failedUrls, ...batchResult.failedUrls];
           return {
-            products: [...accumulator.products, ...batchResult.products],
+            products: newProducts.slice(0, MAX_STORED_PRODUCTS),
             processed: accumulator.processed + batchResult.processed,
             failed: accumulator.failed + batchResult.failed,
-            failedUrls: [...accumulator.failedUrls, ...batchResult.failedUrls],
+            failedUrls: newFailedUrls.slice(0, MAX_FAILED_URLS),
           };
         });
 
@@ -281,25 +308,45 @@ export const generateProductsFromImages = inngest.createFunction(
       console.log(`🎉 [Inngest] Product generation completed for job ${jobId}`);
       console.log(`📈 [Inngest] Results: ${accumulator.processed} succeeded, ${accumulator.failed} failed out of ${imageUrls.length} total`);
 
-      // Update job status to completed
+      // Update job status - accumulate counts instead of overwriting
       if (hasJob(jobId)) {
+        // Get current job state before updating
+        const currentJob = getJob(jobId);
+        const totalExpected = currentJob?.total || imageUrls.length;
+        
+        // Update with accumulated values (updateJob will handle accumulation)
         updateJob(jobId, {
-          status: "completed",
+          status: "processing", // Keep as processing until all events complete
           products: accumulator.products,
-          processed: accumulator.processed,
-          failed: accumulator.failed,
-          total: imageUrls.length,
+          processed: accumulator.processed, // This will be accumulated by updateJob
+          failed: accumulator.failed, // This will be accumulated by updateJob
         });
+        
+        // Check if all events are complete after accumulation
+        const updatedJob = getJob(jobId);
+        if (updatedJob) {
+          const totalProcessed = (updatedJob.processed || 0) + (updatedJob.failed || 0);
+          
+          // Only mark as completed if we've processed all expected images
+          if (totalExpected > 0 && totalProcessed >= totalExpected) {
+            updateJob(jobId, {
+              status: "completed",
+            });
+            console.log(`✅ [Inngest] All events completed for job ${jobId}: ${updatedJob.processed || 0} processed, ${updatedJob.failed || 0} failed out of ${totalExpected} total`);
+          } else {
+            console.log(`⏳ [Inngest] Event completed for job ${jobId}: ${updatedJob.processed || 0}/${totalExpected} processed so far`);
+          }
+        }
       }
 
       return {
         status: "completed",
         jobId,
         totalImages: imageUrls.length,
-        products: accumulator.products,
+        products: accumulator.products, // Already limited to MAX_STORED_PRODUCTS
         processed: accumulator.processed,
         failed: accumulator.failed,
-        failedUrls: accumulator.failedUrls.slice(0, 100), // Limit failed URLs
+        failedUrls: accumulator.failedUrls, // Already limited to MAX_FAILED_URLS
       };
     } catch (error) {
       // Handle job failure
@@ -309,6 +356,18 @@ export const generateProductsFromImages = inngest.createFunction(
         updateJob(jobId, {
           status: "failed",
           error: error instanceof Error ? error.message : String(error),
+        });
+      } else {
+        // Create job if it doesn't exist (process isolation)
+        console.log(`⚠️ [Inngest] Job ${jobId} not found in store (error handler), creating it`);
+        setJob(jobId, {
+          status: "failed",
+          total: imageUrls.length,
+          processed: 0,
+          failed: 0,
+          products: [],
+          error: error instanceof Error ? error.message : String(error),
+          createdAt: Date.now(),
         });
       }
       

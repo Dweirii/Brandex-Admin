@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import prismadb from "@/lib/prismadb";
 import { serializeProduct } from "@/lib/serialize-product";
 import { syncProductToTypesense, deleteProductFromTypesense } from "@/lib/sync-product-to-typesense";
+import { hasValidMedia } from "@/lib/utils/check-image-url";
 
 // GET a single product
 export async function GET(
@@ -25,6 +26,12 @@ export async function GET(
     });
 
     if (!product) {
+      return new NextResponse("Product not found", { status: 404 });
+    }
+
+    // Check if product has valid media (not all 404 images)
+    const hasValid = await hasValidMedia(product.Image, product.videoUrl);
+    if (!hasValid) {
       return new NextResponse("Product not found", { status: 404 });
     }
 

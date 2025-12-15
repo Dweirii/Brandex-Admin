@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { typesenseSearch, PRODUCT_COLLECTION_NAME } from "@/lib/typesense";
 import prismadb from "@/lib/prismadb";
+import { filterProductsWithValidMedia } from "@/lib/utils/check-image-url";
 
 export async function GET(
   req: NextRequest,
@@ -86,17 +87,20 @@ export async function GET(
       .map(id => products.find(p => p.id === id))
       .filter(Boolean);
 
-    const normalizedProducts = orderedProducts.map(product => ({
+    // Filter out products with all 404 images
+    const validProducts = await filterProductsWithValidMedia(orderedProducts);
+
+    const normalizedProducts = validProducts.map(product => ({
       ...product,
-      images: product!.Image,
+      images: product.Image,
     }));
 
     return NextResponse.json(
       {
         results: normalizedProducts,
-        total,
+        total: validProducts.length, // Update total to reflect filtered count
         page,
-        pageCount,
+        pageCount: Math.ceil(validProducts.length / limit),
         limit,
       },
       {
@@ -125,12 +129,15 @@ export async function GET(
         skip: (page - 1) * limit,
       });
 
+      // Filter out products with all 404 images
+      const validProducts = await filterProductsWithValidMedia(products);
+
       return NextResponse.json(
         {
-          results: products.map(p => ({ ...p, images: p.Image })),
-          total: products.length,
+          results: validProducts.map(p => ({ ...p, images: p.Image })),
+          total: validProducts.length,
           page,
-          pageCount: 1,
+          pageCount: Math.ceil(validProducts.length / limit),
           limit,
         },
         {

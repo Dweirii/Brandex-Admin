@@ -228,7 +228,13 @@ export default function CsvMakerPage({ storeId, categories, onImportSuccess }: C
             )
 
             if (!statusResponse.ok) {
-              console.error("Failed to fetch job status")
+              // Job might not exist yet (timing issue) or might be in a different process
+              // Don't spam errors, just silently continue polling
+              if (statusResponse.status === 404) {
+                console.log(`Job ${currentJobId} not found yet, waiting...`)
+                return
+              }
+              console.error(`Failed to fetch job status: ${statusResponse.status}`)
               return
             }
 

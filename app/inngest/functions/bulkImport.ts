@@ -37,6 +37,8 @@ export const bulkImport = inngest.createFunction(
     const totalChunks = Math.ceil(items.length / CHUNK_SIZE);
 
     // Initialize accumulator in a step to persist across replays
+    // Limit failed items to prevent state size issues (max 100 failed items)
+    const MAX_FAILED_ITEMS = 100;
     let accumulator = await step.run("initialize-accumulator", async () => {
       return { successCount: 0, failedCount: 0, failedItems: [] as Array<{ name: string; error: string }> };
     });
@@ -272,11 +274,13 @@ export const bulkImport = inngest.createFunction(
       });
 
       // Accumulate counts in a persistent step
+      // Only keep first MAX_FAILED_ITEMS failed items to prevent state size issues
       accumulator = await step.run(`accumulate-counts-${i}`, async () => {
+        const newFailedItems = [...accumulator.failedItems, ...chunkResult.failedItems];
         return {
           successCount: accumulator.successCount + chunkResult.success,
           failedCount: accumulator.failedCount + chunkResult.failed,
-          failedItems: [...accumulator.failedItems, ...chunkResult.failedItems],
+          failedItems: newFailedItems.slice(0, MAX_FAILED_ITEMS),
         };
       });
     }
@@ -299,7 +303,7 @@ export const bulkImport = inngest.createFunction(
       totalItems: items.length,
       successCount: accumulator.successCount,
       failedCount: accumulator.failedCount,
-      failedItems: accumulator.failedItems.slice(0, 100) // Limit to first 100 failures
+      failedItems: accumulator.failedItems // Already limited to MAX_FAILED_ITEMS
     };
   }
 );

@@ -39,31 +39,46 @@ export async function POST(
       // Queue job to Inngest for background processing
       const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(7)}`
       
-      // Initialize job status
+      // Initialize job status with all required fields
       setJob(jobId, {
         status: "pending",
         total: imageUrls.length,
+        processed: 0,
+        failed: 0,
+        products: [],
         createdAt: Date.now(),
       })
 
-      console.log(`📤 Queuing ${imageUrls.length} images to Inngest (job: ${jobId})`)
+      // Chunk image URLs to avoid state size limits (500 URLs per event)
+      const CHUNK_SIZE = 500;
+      const totalChunks = Math.ceil(imageUrls.length / CHUNK_SIZE);
+      
+      console.log(`📤 Queuing ${imageUrls.length} images to Inngest (job: ${jobId}) in ${totalChunks} chunks`)
 
-      await inngest.send({
-        name: "products.generate-from-images",
-        data: {
-          storeId,
-          imageUrls,
-          categoryId,
-          price: priceValue,
-          jobId,
-        },
-      })
+      // Send events in chunks
+      const events = [];
+      for (let i = 0; i < imageUrls.length; i += CHUNK_SIZE) {
+        const chunk = imageUrls.slice(i, i + CHUNK_SIZE);
+        events.push({
+          name: "products.generate-from-images" as const,
+          data: {
+            storeId,
+            imageUrls: chunk,
+            categoryId,
+            price: priceValue,
+            jobId,
+          },
+        });
+      }
+
+      // Send all events in parallel for faster processing
+      await Promise.all(events.map(event => inngest.send(event)))
 
       return NextResponse.json({
         success: true,
         jobId,
         queued: true,
-        message: `Job queued successfully. Processing ${imageUrls.length} images in the background.`,
+        message: `Job queued successfully. Processing ${imageUrls.length} images in the background in ${totalChunks} batches.`,
         total: imageUrls.length,
       })
     }

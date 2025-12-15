@@ -174,7 +174,7 @@ export const generateProductsFromImages = inngest.createFunction(
         // Process batch with concurrency limit
         for (let i = 0; i < batch.length; i += CONCURRENT_LIMIT) {
           const concurrentBatch = batch.slice(i, i + CONCURRENT_LIMIT);
-          const results = await Promise.allSettled(concurrentBatch.map((url) => processImage(url)));
+          const results = await Promise.allSettled(concurrentBatch.map((url: string) => processImage(url)));
 
           results.forEach((result) => {
             if (result.status === "fulfilled") {
@@ -270,11 +270,7 @@ export const generateProductsFromImages = inngest.createFunction(
                         },
                       },
                     });
-                  }),
-                  {
-                    maxWait: 10000, // 10 seconds max wait
-                    timeout: 30000, // 30 seconds timeout
-                  }
+                  })
                 );
 
                 savedCount.success = newProducts.length;

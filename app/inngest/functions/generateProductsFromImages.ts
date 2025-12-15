@@ -142,7 +142,7 @@ export const generateProductsFromImages = inngest.createFunction(
               } else {
                 productData = JSON.parse(content);
               }
-            } catch (parseError) {
+            } catch {
               console.error(`Failed to parse OpenAI response for ${imageUrl}: ${content.substring(0, 100)}...`);
               // Fallback: create basic product from URL
               const urlParts = imageUrl.split("/").pop() || "Product";

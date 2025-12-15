@@ -24,7 +24,7 @@ export async function isImageUrlValid(url: string): Promise<boolean> {
 
     // Consider 200-299 and 300-399 as valid (redirects are OK)
     return response.status >= 200 && response.status < 400;
-  } catch (error) {
+  } catch {
     // Network errors, timeouts, or invalid URLs are considered invalid
     return false;
   }

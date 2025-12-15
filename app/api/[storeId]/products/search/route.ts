@@ -50,9 +50,6 @@ export async function GET(
         highlight_full_fields: 'name',
       });
 
-    const total = searchResults.found;
-    const pageCount = Math.ceil(total / limit);
-
     // Get product IDs from search results
     const productIds = searchResults.hits?.map(hit => (hit.document as { id: string }).id) || [];
     
@@ -85,7 +82,7 @@ export async function GET(
     // Maintain Typesense's search ranking order
     const orderedProducts = productIds
       .map(id => products.find(p => p.id === id))
-      .filter(Boolean);
+      .filter((p): p is NonNullable<typeof p> => p !== undefined);
 
     // Filter out products with all 404 images
     const validProducts = await filterProductsWithValidMedia(orderedProducts);

@@ -1,6 +1,4 @@
 // app/api/inngest/route.ts
-
-import { Inngest } from "inngest";
 import { serve } from "inngest/next";
 import { bulkImport } from "@/app/inngest/functions/bulkImport";
 import { generateProductsFromImages } from "@/app/inngest/functions/generateProductsFromImages";
@@ -10,7 +8,7 @@ import {
   sendMonthlyReport,
 } from "@/app/inngest/functions/scheduled-reports";
 
-const inngest = new Inngest({ id: "brandex-app" });
+import { inngest } from "@/app/inngest/inngest";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -21,4 +19,5 @@ export const { GET, POST, PUT } = serve({
     sendWeeklyReport,
     sendMonthlyReport,
   ],
+  servePath: "/api/inngest",
 });

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { useDropzone } from "react-dropzone"
 import Papa from "papaparse"
 import { toast } from "react-hot-toast"
@@ -42,7 +42,7 @@ interface ImportResult {
 
 type ImportStatus = "idle" | "parsing" | "uploading" | "completed" | "error"
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const PREVIEW_ROWS = 5
 
 export default function CsvImportPage({ storeId, onImportSuccess }: CsvImportPageProps) {
@@ -55,9 +55,56 @@ export default function CsvImportPage({ storeId, onImportSuccess }: CsvImportPag
   const [showErrorManagement, setShowErrorManagement] = useState(false)
   const [originalRows, setOriginalRows] = useState<ProductImportRow[]>([])
 
-  const isLoading = status === "parsing" || status === "uploading"
+  // Monitoring state
+  const [monitoring, setMonitoring] = useState(false)
+  const [currentImportId, setCurrentImportId] = useState<string | null>(null)
+
+  const isLoading = status === "parsing" || status === "uploading" || monitoring
   const hasErrors = validationErrors.length > 0
   const canImport = rows.length > 0 && !hasErrors && !isLoading
+
+  // Polling effect
+  useEffect(() => {
+    if (!monitoring || !currentImportId) return
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/${storeId}/import-status/${currentImportId}`)
+        if (!res.ok) return
+
+        const data = await res.json()
+
+        // Calculate progress
+        const total = data.totalRows || 1
+        const processed = (data.processedRows || 0) + (data.failedRows || 0)
+        const progress = Math.min(Math.round((processed / total) * 100), 100)
+
+        setUploadProgress(progress)
+
+        if (data.status === "COMPLETED" || data.status === "FAILED" || data.status === "COMPLETED_WITH_ERRORS") {
+          setMonitoring(false)
+          setStatus("completed")
+          setImportResult({
+            success: data.status !== "FAILED",
+            processed: data.processedRows || 0,
+            failed: data.failedRows || 0,
+            errors: [],
+            failedRows: [] // We don't have these details in the poll response yet
+          })
+
+          if (data.status === "FAILED") {
+            toast.error("Import failed.")
+          } else {
+            toast.success("Import completed!")
+          }
+        }
+      } catch (error) {
+        console.error("Polling error:", error)
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [monitoring, currentImportId, storeId])
 
   const stats = useMemo(
     () => ({
@@ -93,7 +140,7 @@ export default function CsvImportPage({ storeId, onImportSuccess }: CsvImportPag
 
           setOriginalRows(results.data)
           const { validRows, errors } = validateProductBatch(results.data)
-          
+
           setRows(validRows)
           setValidationErrors(errors)
           setStatus("completed")
@@ -144,14 +191,6 @@ export default function CsvImportPage({ storeId, onImportSuccess }: CsvImportPag
     setStatus("uploading")
     setUploadProgress(0)
 
-    // Simulate progress updates
-    const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 90) return prev
-        return prev + Math.random() * 15
-      })
-    }, 300)
-
     try {
       const response = await fetch(`/api/${storeId}/products/bulk-import`, {
         method: "POST",
@@ -164,25 +203,30 @@ export default function CsvImportPage({ storeId, onImportSuccess }: CsvImportPag
         }),
       })
 
-      clearInterval(progressInterval)
-      setUploadProgress(100)
-
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const result: ImportResult = await response.json()
-      setImportResult(result)
-      setStatus("completed")
+      const result = await response.json()
 
-      if (result.success) {
-        toast.success(`Successfully imported ${result.processed} products!`)
-        onImportSuccess?.()
+      if (result.success && result.importId) {
+        // Start monitoring
+        setCurrentImportId(result.importId)
+        setMonitoring(true)
+        toast.success("Import queued. Processing in background...")
       } else {
-        toast.error(`Import completed with ${result.failed} failures. Check the details below.`)
+        // Fallback for old behavior or error
+        setImportResult(result)
+        setStatus("completed")
+        setUploadProgress(100)
+        if (result.success) {
+          toast.success(`Successfully imported ${result.processed} products!`)
+          onImportSuccess?.()
+        } else {
+          toast.error(`Import completed with ${result.failed} failures.`)
+        }
       }
     } catch (error) {
-      clearInterval(progressInterval)
       console.error("Import error:", error)
       toast.error("Import failed. Please try again or contact support.")
       setStatus("error")
@@ -252,10 +296,9 @@ export default function CsvImportPage({ storeId, onImportSuccess }: CsvImportPag
             className={`
               flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg 
               transition-all duration-200 cursor-pointer
-              ${
-                isDragActive
-                  ? "border-primary bg-primary/5"
-                  : "border-muted-foreground/25 hover:border-primary hover:bg-muted/50"
+              ${isDragActive
+                ? "border-primary bg-primary/5"
+                : "border-muted-foreground/25 hover:border-primary hover:bg-muted/50"
               }
               ${isLoading ? "pointer-events-none opacity-50" : ""}
             `}

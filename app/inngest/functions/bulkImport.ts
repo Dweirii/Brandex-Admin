@@ -21,17 +21,24 @@ interface BulkImportEvent {
   data: {
     storeId: string;
     items: ProductRow[];
+    importId?: string;
   };
 }
 
 export const bulkImport = inngest.createFunction(
-  { id: "bulk-import", name: "Bulk Import Products" },
+  {
+    id: "bulk-import",
+    name: "Bulk Import Products",
+    concurrency: {
+      limit: 5,
+    }
+  },
   { event: "bulk.import" },
   async ({ event, step }) => {
-    const { items, storeId } = event.data;
+    const { items, storeId, importId } = event.data;
     const CHUNK_SIZE = 100;
 
-    console.log(`🚀 [Inngest] Starting bulk import for store ${storeId}`);
+    console.log(`🚀 [Inngest] Starting bulk import for store ${storeId} (ImportID: ${importId || 'none'})`);
     console.log(`📊 [Inngest] Processing ${items.length} items in chunks of ${CHUNK_SIZE}`);
 
     const totalChunks = Math.ceil(items.length / CHUNK_SIZE);
@@ -97,11 +104,11 @@ export const bulkImport = inngest.createFunction(
                     await prismadb.image.deleteMany({ where: { productId: existing.id } });
                     if (imageUrls.length > 0) {
                       await prismadb.image.createMany({
-                        data: imageUrls.map((url: string) => ({ 
-                          id: crypto.randomUUID(), 
-                          url: url.trim(), 
-                          productId: existing.id, 
-                          updatedAt: new Date() 
+                        data: imageUrls.map((url: string) => ({
+                          id: crypto.randomUUID(),
+                          url: url.trim(),
+                          productId: existing.id,
+                          updatedAt: new Date()
                         })),
                       });
                     }
@@ -127,11 +134,11 @@ export const bulkImport = inngest.createFunction(
                 await prismadb.image.deleteMany({ where: { productId: existing.id } });
                 if (imageUrls.length > 0) {
                   await prismadb.image.createMany({
-                    data: imageUrls.map((url: string) => ({ 
-                      id: crypto.randomUUID(), 
-                      url: url.trim(), 
-                      productId: existing.id, 
-                      updatedAt: new Date() 
+                    data: imageUrls.map((url: string) => ({
+                      id: crypto.randomUUID(),
+                      url: url.trim(),
+                      productId: existing.id,
+                      updatedAt: new Date()
                     })),
                   });
                 }
@@ -191,11 +198,11 @@ export const bulkImport = inngest.createFunction(
                       await prismadb.image.deleteMany({ where: { productId: existingProduct.id } });
                       if (imageUrls.length > 0) {
                         await prismadb.image.createMany({
-                          data: imageUrls.map((url: string) => ({ 
-                            id: crypto.randomUUID(), 
-                            url: url.trim(), 
-                            productId: existingProduct.id, 
-                            updatedAt: new Date() 
+                          data: imageUrls.map((url: string) => ({
+                            id: crypto.randomUUID(),
+                            url: url.trim(),
+                            productId: existingProduct.id,
+                            updatedAt: new Date()
                           })),
                         });
                       }
@@ -223,11 +230,11 @@ export const bulkImport = inngest.createFunction(
 
                   if (existingImages.length === 0) {
                     await prismadb.image.createMany({
-                      data: imageUrls.map((url: string) => ({ 
-                        id: crypto.randomUUID(), 
-                        url: url.trim(), 
-                        productId: product.id, 
-                        updatedAt: new Date() 
+                      data: imageUrls.map((url: string) => ({
+                        id: crypto.randomUUID(),
+                        url: url.trim(),
+                        productId: product.id,
+                        updatedAt: new Date()
                       })),
                     });
                   }
@@ -273,6 +280,30 @@ export const bulkImport = inngest.createFunction(
         };
       });
 
+      // Update Import Log if ID is present
+      if (importId) {
+        await step.run(`update-log-${i}`, async () => {
+          const updatedLog = await prismadb.product_import_logs.update({
+            where: { id: importId },
+            data: {
+              processedRows: { increment: chunkResult.success },
+              failedRows: { increment: chunkResult.failed },
+            }
+          });
+
+          // Check completion
+          if ((updatedLog.processedRows || 0) + (updatedLog.failedRows || 0) >= updatedLog.totalRows) {
+            await prismadb.product_import_logs.update({
+              where: { id: importId },
+              data: {
+                status: "COMPLETED",
+                completedAt: new Date()
+              }
+            });
+          }
+        });
+      }
+
       // Accumulate counts in a persistent step
       // Only keep first MAX_FAILED_ITEMS failed items to prevent state size issues
       accumulator = await step.run(`accumulate-counts-${i}`, async () => {
@@ -287,7 +318,7 @@ export const bulkImport = inngest.createFunction(
 
     console.log(`🎉 [Inngest] Bulk import completed for store ${storeId}`);
     console.log(`📈 [Inngest] Results: ${accumulator.successCount} succeeded, ${accumulator.failedCount} failed out of ${items.length} total`);
-    
+
     if (accumulator.failedCount > 0) {
       console.error(`⚠️ [Inngest] ${accumulator.failedCount} items failed to import`);
       accumulator.failedItems.slice(0, 10).forEach((item) => {
@@ -298,8 +329,8 @@ export const bulkImport = inngest.createFunction(
       }
     }
 
-    return { 
-      status: "completed", 
+    return {
+      status: "completed",
       totalItems: items.length,
       successCount: accumulator.successCount,
       failedCount: accumulator.failedCount,

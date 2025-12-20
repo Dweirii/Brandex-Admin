@@ -74,7 +74,6 @@ export async function GET(
         min_len_2typo: 7,
         drop_tokens_threshold: 1, // Only drop tokens if absolutely necessary
         prioritize_exact_match: true,
-        exhaustive: true, // Go through more documents for the absolute best match
         highlight_full_fields: 'name',
       });
 

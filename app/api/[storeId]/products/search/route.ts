@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { typesenseSearch, PRODUCT_COLLECTION_NAME } from "@/lib/typesense";
 import prismadb from "@/lib/prismadb";
 import { filterProductsWithValidMedia } from "@/lib/utils/check-image-url";
+import { translate } from 'google-translate-api-x';
 
 export async function GET(
   req: NextRequest,
@@ -25,23 +26,22 @@ export async function GET(
   }
 
   let finalQuery = query;
+  let isTranslated = false;
 
   try {
     // Detect if the query contains Arabic or non-English characters
     const hasNonEnglishChars = /[^\u0000-\u007F]/.test(query);
 
     if (hasNonEnglishChars) {
-      // Dynamically import translation library to avoid cold start issues if not needed
-      const { translate } = await import('google-translate-api-x');
       const res = await translate(query, { to: 'en' });
-      if (res.text) {
+      if (res.text && res.text.toLowerCase() !== query.toLowerCase()) {
         console.log(`Translated query: "${query}" -> "${res.text}"`);
         finalQuery = res.text;
+        isTranslated = true;
       }
     }
   } catch (translationError) {
     console.error("Translation failed, proceeding with original query:", translationError);
-    // Proceed with original query if translation fails
   }
 
   try {
@@ -83,6 +83,11 @@ export async function GET(
           page,
           pageCount: 0,
           limit,
+          debug: {
+            originalQuery: query,
+            finalQuery: finalQuery,
+            isTranslated: isTranslated
+          }
         },
         {
           status: 200,
@@ -117,10 +122,15 @@ export async function GET(
     return NextResponse.json(
       {
         results: normalizedProducts,
-        total: validProducts.length, // Update total to reflect filtered count
+        total: validProducts.length,
         page,
         pageCount: Math.ceil(validProducts.length / limit),
         limit,
+        debug: {
+          originalQuery: query,
+          finalQuery: finalQuery,
+          isTranslated: isTranslated
+        }
       },
       {
         status: 200,
@@ -130,14 +140,18 @@ export async function GET(
   } catch (error) {
     console.error("Typesense search error:", error);
 
-    // Fallback to basic DB search if Typesense fails
-    console.log("Falling back to database search...");
+    // Fallback to basic DB search
     try {
       const products = await prismadb.products.findMany({
         where: {
           storeId,
           isArchived: false,
-          name: { contains: query, mode: "insensitive" },
+          OR: [
+            { name: { contains: query, mode: "insensitive" } },
+            { name: { contains: finalQuery, mode: "insensitive" } },
+            { description: { contains: query, mode: "insensitive" } },
+            { description: { contains: finalQuery, mode: "insensitive" } }
+          ],
           ...(categoryId && { categoryId }),
         },
         include: {
@@ -148,7 +162,6 @@ export async function GET(
         skip: (page - 1) * limit,
       });
 
-      // Filter out products with all 404 images
       const validProducts = await filterProductsWithValidMedia(products);
 
       return NextResponse.json(
@@ -158,6 +171,12 @@ export async function GET(
           page,
           pageCount: Math.ceil(validProducts.length / limit),
           limit,
+          debug: {
+            originalQuery: query,
+            finalQuery: finalQuery,
+            isTranslated: isTranslated,
+            fallbackUsed: true
+          }
         },
         {
           status: 200,

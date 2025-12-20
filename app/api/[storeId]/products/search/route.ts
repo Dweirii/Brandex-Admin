@@ -75,7 +75,16 @@ export async function GET(
         drop_tokens_threshold: 1, // Only drop tokens if absolutely necessary
         prioritize_exact_match: true,
         highlight_full_fields: 'name',
+        facet_by: 'keywords', // Return top keywords as facets
+        max_facet_values: 20,  // Show top 20 keywords
       });
+
+    // Extract facets for "Subcategories" (derived from keywords)
+    const facets = searchResults.facet_counts?.find(f => f.field_name === 'keywords')?.counts || [];
+    const subcategories = facets.map(f => ({
+      name: f.value,
+      count: f.count
+    }));
 
     // Get product IDs from search results
     const productIds = searchResults.hits?.map(hit => (hit.document as { id: string }).id) || [];
@@ -88,6 +97,7 @@ export async function GET(
           page,
           pageCount: 0,
           limit,
+          subcategories: [],
           debug: {
             originalQuery: query,
             finalQuery: finalQuery,
@@ -131,6 +141,7 @@ export async function GET(
         page,
         pageCount: Math.ceil(validProducts.length / limit),
         limit,
+        subcategories, // Dynamic subcategories from keywords
         debug: {
           originalQuery: query,
           finalQuery: finalQuery,

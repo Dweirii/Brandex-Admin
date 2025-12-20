@@ -11,7 +11,7 @@ async function main() {
     const storeId = process.argv[2];
 
     if (!storeId) {
-        console.log("❌ Please provide a Store ID.");
+        console.log("Please provide a Store ID.");
 
         try {
             const stores = await prisma.store.findMany();

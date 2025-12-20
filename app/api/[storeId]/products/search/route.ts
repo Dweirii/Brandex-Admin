@@ -37,7 +37,9 @@ export async function GET(
       .documents()
       .search({
         q: query,
+        // Boost Name (4x) and Keywords (2x) over Description
         query_by: 'name,keywords,description',
+        query_by_weights: '4,2,1',
         filter_by: filterBy,
         sort_by: '_text_match:desc,downloadsCount:desc',
         per_page: limit,
@@ -52,7 +54,7 @@ export async function GET(
 
     // Get product IDs from search results
     const productIds = searchResults.hits?.map(hit => (hit.document as { id: string }).id) || [];
-    
+
     if (productIds.length === 0) {
       return NextResponse.json(
         {
@@ -107,7 +109,7 @@ export async function GET(
     );
   } catch (error) {
     console.error("Typesense search error:", error);
-    
+
     // Fallback to basic DB search if Typesense fails
     console.log("Falling back to database search...");
     try {

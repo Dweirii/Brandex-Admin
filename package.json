@@ -39,6 +39,7 @@
     "dotenv": "^17.2.3",
     "exceljs": "^4.4.0",
     "framer-motion": "^12.6.2",
+    "google-translate-api-x": "^10.7.2",
     "inngest": "^3.39.1",
     "inngest-cli": "^1.6.4",
     "jose": "^6.0.11",

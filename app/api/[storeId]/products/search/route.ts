@@ -24,6 +24,26 @@ export async function GET(
     );
   }
 
+  let finalQuery = query;
+
+  try {
+    // Detect if the query contains Arabic or non-English characters
+    const hasNonEnglishChars = /[^\u0000-\u007F]/.test(query);
+
+    if (hasNonEnglishChars) {
+      // Dynamically import translation library to avoid cold start issues if not needed
+      const { translate } = await import('google-translate-api-x');
+      const res = await translate(query, { to: 'en' });
+      if (res.text) {
+        console.log(`Translated query: "${query}" -> "${res.text}"`);
+        finalQuery = res.text;
+      }
+    }
+  } catch (translationError) {
+    console.error("Translation failed, proceeding with original query:", translationError);
+    // Proceed with original query if translation fails
+  }
+
   try {
     // Build Typesense filter
     let filterBy = `storeId:=${storeId} && isArchived:=false`;
@@ -36,7 +56,7 @@ export async function GET(
       .collections(PRODUCT_COLLECTION_NAME)
       .documents()
       .search({
-        q: query,
+        q: finalQuery, // Use the translated query
         // Boost Name (4x) and Keywords (2x) over Description
         query_by: 'name,keywords,description',
         query_by_weights: '4,2,1',

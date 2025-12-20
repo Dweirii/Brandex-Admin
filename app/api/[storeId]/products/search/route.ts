@@ -44,6 +44,10 @@ export async function GET(
     console.error("Translation failed, proceeding with original query:", translationError);
   }
 
+  // Build the enhanced query: Translated + Original for maximum accuracy
+  // This allows Typesense to match against Arabic keywords if present, or English via translation
+  const searchQ = isTranslated ? `${finalQuery} ${query}` : query;
+
   try {
     // Build Typesense filter
     let filterBy = `storeId:=${storeId} && isArchived:=false`;
@@ -51,24 +55,26 @@ export async function GET(
       filterBy += ` && categoryId:=${categoryId}`;
     }
 
-    // Search with Typesense (lightning fast!)
+    // Search with Typesense (High-Accuracy tuning)
     const searchResults = await typesenseSearch
       .collections(PRODUCT_COLLECTION_NAME)
       .documents()
       .search({
-        q: finalQuery, // Use the translated query
-        // Boost Name (4x) and Keywords (2x) over Description
-        query_by: 'name,keywords,description',
-        query_by_weights: '4,2,1',
+        q: searchQ,
+        // Boost Name (10x) and Category (4x) / Keywords (4x) over Description (1x)
+        query_by: 'name,keywords,categoryName,description',
+        query_by_weights: '10,4,4,1',
         filter_by: filterBy,
         sort_by: '_text_match:desc,downloadsCount:desc',
         per_page: limit,
         page: page,
-        prefix: true, // Enables "type-ahead" search
-        num_typos: 2, // Allow up to 2 typos (handles "canva" -> "canvas")
-        typo_tokens_threshold: 1,
-        drop_tokens_threshold: 2,
+        prefix: true,
+        num_typos: 2,
+        min_len_1typo: 4, // Don't allow typos on very short words to keep it accurate
+        min_len_2typo: 7,
+        drop_tokens_threshold: 1, // Only drop tokens if absolutely necessary
         prioritize_exact_match: true,
+        exhaustive: true, // Go through more documents for the absolute best match
         highlight_full_fields: 'name',
       });
 
